@@ -71,7 +71,7 @@ class GeneratedContent(Base):
     stage = Column(String(50), nullable=False)  # empathise, define, ideate, etc.
     content_type = Column(String(100), nullable=False)  # persona, journey_map, hmw_questions, etc.
     content = Column(Text, nullable=False)
-    metadata = Column(JSON, nullable=True)  # Additional metadata
+    extra_metadata = Column(JSON, nullable=True)  # Additional metadata
     created_at = Column(DateTime, default=datetime.utcnow)
 
     # Relationships
