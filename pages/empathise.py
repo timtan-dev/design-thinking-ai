@@ -12,46 +12,14 @@ RESEARCH_METHODS = {
     "diary_study": {"name": "Diary Study", "icon": "📔"}
 }
 
-# def render_empathise_page(project):
-#     """Render the Empathise stage page with data collection cards"""
-#     st.markdown("<div class='section-header'>📊 Collect Data</div>", unsafe_allow_html=True)
-#     db = get_db()
-#     uploaded_data = db.query(ResearchData).filter(ResearchData.project_id == project.id).all()
-#     db.close()
-#     uploaded_methods = {data.method_type for data in uploaded_data}
-
-#     st.markdown('<div class="cards-grid">', unsafe_allow_html=True)
-#     cols = st.columns(3)
-#     for idx, (method_key, method_info) in enumerate(RESEARCH_METHODS.items()):
-#         with cols[idx % 3]:
-#             is_uploaded = method_key in uploaded_methods
-#             status_text = "✓ Data uploaded" if is_uploaded else "Click to upload data"
-#             with st.container():
-#                 st.markdown(f"""
-#                     <div class="method-card">
-#                         <div class="method-icon">{method_info['icon']}</div>
-#                         <div class="method-name">{method_info['name']}</div>
-#                         <div class="method-status">{status_text}</div>
-#                     </div>
-#                 """, unsafe_allow_html=True)
-#                 uploaded_file = st.file_uploader(f"Upload {method_info['name']} data", key=f"upload_{method_key}")
-#                 if uploaded_file and st.button(f"💾 Save", key=f"save_{method_key}", use_container_width=True):
-#                     save_research_data(project.id, method_key, uploaded_file)
-#                     st.rerun()
-
 def render_empathise_page(project):
-    """Render the Empathise stage page with data collection cards"""
-    st.markdown("""
-        <div class="section-header">
-            <span class="section-icon">📊</span>
-            <span class="section-title">Collect Data</span>
-        </div>
-    """, unsafe_allow_html=True)
-
     db = get_db()
     uploaded_data = db.query(ResearchData).filter(ResearchData.project_id == project.id).all()
     db.close()
     uploaded_methods = {data.method_type for data in uploaded_data}
+
+    # Add margin between stage section and method section
+    st.markdown('<div style="margin-top: 2rem;"></div>', unsafe_allow_html=True)
 
     st.markdown('<div class="cards-grid">', unsafe_allow_html=True)
     cols = st.columns(3)
@@ -59,8 +27,6 @@ def render_empathise_page(project):
     for idx, (method_key, method_info) in enumerate(RESEARCH_METHODS.items()):
         with cols[idx % 3]:
             is_uploaded = method_key in uploaded_methods
-            status_text = "✓ Data uploaded" if is_uploaded else "Click to upload data"
-            card_class = "uploaded" if is_uploaded else ""
 
             # Render clickable card
             if st.button(
@@ -72,7 +38,8 @@ def render_empathise_page(project):
                 open_method_dialog(project.id, method_key, method_info["name"])
 
             # Small caption for status
-            st.caption(status_text)
+            if is_uploaded:
+                st.caption("✓ Data uploaded")
 
     st.markdown("</div>", unsafe_allow_html=True)
 
@@ -80,12 +47,11 @@ def render_empathise_page(project):
 @st.dialog("Upload Research Data")
 def open_method_dialog(project_id, method_key, method_name):
     """Dialog window for uploading data or downloading a template"""
-    st.markdown(f"### {method_name} ({method_key})")
-    st.markdown("You can upload your collected research data or download a template to guide your data collection.")
+    st.markdown(f"### {method_name}")
 
     # File uploader
     uploaded_file = st.file_uploader(
-        f"Upload {method_name} data",
+        label="",
         type=["txt", "pdf", "docx", "csv"],
         key=f"upload_dialog_{method_key}"
     )

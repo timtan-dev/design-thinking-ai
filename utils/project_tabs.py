@@ -35,6 +35,8 @@ def render_project_header(project):
 
 def render_stage_tabs(current_stage):
     from utils.project_tabs import update_project_stage  # avoid circular import
+    st.markdown('### Stages')
+
     cols = st.columns(6)
     for idx, (stage_num, stage_info) in enumerate(STAGES.items()):
         with cols[idx]:
