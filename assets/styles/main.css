@@ -1,36 +1,20 @@
 :root {
-    --primary-gradient: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
-    --primary-color: #667eea;
-    --secondary-color: #764ba2;
-    --hover-color: #7c8ff0;
+    --primary-gradient: linear-gradient(135deg, #a8d8ea 0%, #c8e6f5 100%);
+    --primary-color: #a8d8ea;
+    --secondary-color: #c8e6f5;
+    --hover-color: #8ac6d1;
     --light-purple: #f0f1ff;
     --text-dark: #1a202c;
     --text-light: #718096;
     --border-color: #e2e8f0;
-    --shadow: 0 4px 6px rgba(102, 126, 234, 0.1);
-    --shadow-hover: 0 8px 15px rgba(102, 126, 234, 0.2);
+    --shadow: 0 4px 6px rgba(168, 216, 234, 0.1);
+    --shadow-hover: 0 8px 15px rgba(168, 216, 234, 0.2);
 }
 
 /* Hide Streamlit's page navigation */
 [data-testid="stSidebarNav"] {
     display: none;
 }
-
-.stButton > button {
-    background: var(--primary-gradient);
-    color: white;
-    border: none;
-    border-radius: 8px;
-    font-weight: 600;
-    transition: all 0.3s ease;
-    box-shadow: var(--shadow);
-}
-
-.stButton > button:hover {
-    transform: translateY(-2px);
-    box-shadow: var(--shadow-hover);
-}
-
 
 /* Project Header */
 .project-header {
