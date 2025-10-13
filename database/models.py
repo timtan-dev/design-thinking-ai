@@ -16,6 +16,7 @@ class Project(Base):
     name = Column(String(255), nullable=False)
     area = Column(String(255), nullable=False)
     goal = Column(Text, nullable=False)
+    current_stage = Column(Integer, default=1)  # 1-6 for the six stages
     created_at = Column(DateTime, default=datetime.utcnow)
     updated_at = Column(DateTime, default=datetime.utcnow, onupdate=datetime.utcnow)
     user_id = Column(String(255), nullable=True)  # For future multi-user support
@@ -52,9 +53,10 @@ class ResearchData(Base):
     id = Column(Integer, primary_key=True, index=True)
     project_id = Column(Integer, ForeignKey("projects.id"), nullable=False)
     method_type = Column(String(100), nullable=False)  # interview, survey, ethnography, etc.
-    file_path = Column(String(500), nullable=True)
-    processed_data = Column(JSON, nullable=True)  # Extracted insights
-    uploaded_at = Column(DateTime, default=datetime.utcnow)
+    file_path = Column(Text, nullable=True)
+    file_content = Column(Text, nullable=True)
+    processed = Column(Boolean, default=False)
+    created_at = Column(DateTime, default=datetime.utcnow)
 
     # Relationships
     project = relationship("Project", back_populates="research_data")
@@ -68,17 +70,15 @@ class GeneratedContent(Base):
 
     id = Column(Integer, primary_key=True, index=True)
     project_id = Column(Integer, ForeignKey("projects.id"), nullable=False)
-    stage = Column(String(50), nullable=False)  # empathise, define, ideate, etc.
-    content_type = Column(String(100), nullable=False)  # persona, journey_map, hmw_questions, etc.
+    content_type = Column(String(100), nullable=False)  # empathy_map, persona, journey_map, etc.
     content = Column(Text, nullable=False)
-    extra_metadata = Column(JSON, nullable=True)  # Additional metadata
     created_at = Column(DateTime, default=datetime.utcnow)
 
     # Relationships
     project = relationship("Project", back_populates="generated_content")
 
     def __repr__(self):
-        return f"<GeneratedContent(id={self.id}, stage='{self.stage}', type='{self.content_type}')>"
+        return f"<GeneratedContent(id={self.id}, type='{self.content_type}')>"
 
 class Template(Base):
     """Template storage for various research methods"""
