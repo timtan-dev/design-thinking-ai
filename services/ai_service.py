@@ -136,21 +136,35 @@ class AIService:
 
     # EMPATHISE STAGE - Data Analysis
 
-    def create_empathy_map(self, project: Dict[str, Any]) -> str:
+    def create_empathy_map(self, project: Dict[str, Any], research_data_list: list = None) -> str:
         """Create empathy map from research data"""
         from prompts.empathise.empathy_map import EMPATHY_MAP_PROMPT
 
-        user_prompt = f"""
-        Based on the project context:
-        Project: {project['name']}
-        Area: {project['area']}
-        Goal: {project['goal']}
+        # Build research data section
+        research_section = ""
+        if research_data_list:
+            research_section = "\n\n**UPLOADED RESEARCH DATA:**\n\n"
+            for idx, data in enumerate(research_data_list, 1):
+                method_name = data.get('method_type', 'Unknown').replace('_', ' ').title()
+                content = data.get('file_content', '')
+                research_section += f"--- Research Method {idx}: {method_name} ---\n{content}\n\n"
+        else:
+            research_section = "\n\n**NOTE:** No research data has been uploaded yet. Generate a sample empathy map based on the project context as a starting template.\n\n"
 
-        Create an empathy map with sections:
-        - Says: What the user says
-        - Thinks: What the user thinks
-        - Does: What the user does
-        - Feels: What the user feels
+        user_prompt = f"""
+        **Project Context:**
+        Project Name: {project['name']}
+        Project Area: {project['area']}
+        Project Goal: {project['goal']}
+        {research_section}
+        **Your Task:**
+        Analyze the uploaded research data above and create a comprehensive empathy map with sections:
+        - SAYS: What the user verbalizes (extract direct quotes from the research data)
+        - THINKS: What the user thinks (infer from their responses)
+        - DOES: What the user does (identify behaviors from observations/self-reports)
+        - FEELS: What the user feels (identify emotional states from the data)
+
+        Base your empathy map entirely on the research data provided. Include specific references to which research method the insights come from (e.g., "Interview 1", "Survey Response", "Observation Notes").
         """
 
         return self._call_openai(EMPATHY_MAP_PROMPT, user_prompt)
