@@ -1,6 +1,7 @@
 import streamlit as st
 from config.database import get_db
-from database.models import GeneratedContent, ResearchData
+from database.models import GeneratedContent, ResearchData, Project
+from services.ai_service import AIService
 
 ANALYSIS_METHODS = {
     "empathy_map": {"name": "Empathy Map", "icon": "🧩"},
@@ -41,12 +42,84 @@ def render_define_page(project):
                     st.rerun()
 
 def generate_analysis(project_id, content_type, content_name, research_data):
-    placeholder_content = f"## {content_name} Analysis\nPlaceholder analysis content."
+    """Generate AI-powered analysis using uploaded research data"""
     db = get_db()
+
     try:
-        generated = GeneratedContent(project_id=project_id, content_type=content_type, content=placeholder_content)
-        db.add(generated)
-        db.commit()
-        st.success(f"{content_name} generated successfully!")
+        # Fetch project object
+        project = db.query(Project).filter(Project.id == project_id).first()
+        if not project:
+            st.error("Project not found!")
+            return
+
+        # Show generating message
+        with st.spinner(f"🤖 Generating {content_name}... This may take a moment."):
+            # Initialize AI service
+            ai_service = AIService()
+
+            # Format research data for AI service
+            research_data_list = []
+            for data in research_data:
+                research_data_list.append({
+                    'method_type': data.method_type,
+                    'file_content': data.file_content,
+                    'file_path': data.file_path
+                })
+
+            # Prepare project dict for AI service
+            project_dict = {
+                'name': project.name,
+                'area': project.area,
+                'goal': project.goal
+            }
+
+            # Generate content based on type
+            generated_content = None
+
+            if content_type == "empathy_map":
+                generated_content = ai_service.create_empathy_map(project_dict, research_data_list)
+
+            elif content_type == "persona":
+                generated_content = ai_service.create_persona(project_dict, research_data_list)
+
+            elif content_type == "journey_map":
+                generated_content = ai_service.create_journey_map(project_dict, research_data_list)
+
+            elif content_type == "affinity_map":
+                generated_content = ai_service.create_affinity_map(project_dict, research_data_list)
+
+            elif content_type == "storytelling":
+                generated_content = ai_service.create_user_story(project_dict, research_data_list)
+
+            elif content_type == "stakeholder_map":
+                generated_content = ai_service.create_stakeholder_map(project_dict, research_data_list)
+
+            else:
+                st.error(f"Unknown analysis type: {content_type}")
+                return
+
+            if not generated_content:
+                st.error("Failed to generate content. Please try again.")
+                return
+
+            # Save to database
+            new_content = GeneratedContent(
+                project_id=project_id,
+                content_type=content_type,
+                content=generated_content
+            )
+            db.add(new_content)
+            db.commit()
+
+            st.success(f"✅ {content_name} generated successfully!")
+
+            # Show preview in expander
+            with st.expander("📄 View Generated Content", expanded=True):
+                st.markdown(generated_content)
+
+    except Exception as e:
+        st.error(f"Error generating {content_name}: {str(e)}")
+        db.rollback()
+
     finally:
         db.close()

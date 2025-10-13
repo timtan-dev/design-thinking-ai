@@ -43,6 +43,27 @@ class AIService:
         except Exception as e:
             return f"Error generating content: {str(e)}"
 
+    def _format_research_data(self, research_data_list: list) -> str:
+        """
+        Format research data for inclusion in prompts
+
+        Args:
+            research_data_list: List of research data dictionaries
+
+        Returns:
+            Formatted research data string
+        """
+        if not research_data_list:
+            return "\n\n**NOTE:** No research data has been uploaded yet. Generate a sample analysis based on the project context as a starting template.\n\n"
+
+        research_section = "\n\n**UPLOADED RESEARCH DATA:**\n\n"
+        for idx, data in enumerate(research_data_list, 1):
+            method_name = data.get('method_type', 'Unknown').replace('_', ' ').title()
+            content = data.get('file_content', '')
+            research_section += f"--- Research Method {idx}: {method_name} ---\n{content}\n\n"
+
+        return research_section
+
     # EMPATHISE STAGE - Data Collection
 
     def generate_interview_questions(self, project: Dict[str, Any]) -> str:
@@ -140,16 +161,7 @@ class AIService:
         """Create empathy map from research data"""
         from prompts.empathise.empathy_map import EMPATHY_MAP_PROMPT
 
-        # Build research data section
-        research_section = ""
-        if research_data_list:
-            research_section = "\n\n**UPLOADED RESEARCH DATA:**\n\n"
-            for idx, data in enumerate(research_data_list, 1):
-                method_name = data.get('method_type', 'Unknown').replace('_', ' ').title()
-                content = data.get('file_content', '')
-                research_section += f"--- Research Method {idx}: {method_name} ---\n{content}\n\n"
-        else:
-            research_section = "\n\n**NOTE:** No research data has been uploaded yet. Generate a sample empathy map based on the project context as a starting template.\n\n"
+        research_section = self._format_research_data(research_data_list)
 
         user_prompt = f"""
         **Project Context:**
@@ -169,78 +181,121 @@ class AIService:
 
         return self._call_openai(EMPATHY_MAP_PROMPT, user_prompt)
 
-    def create_persona(self, project: Dict[str, Any]) -> str:
+    def create_persona(self, project: Dict[str, Any], research_data_list: list = None) -> str:
         """Create user persona"""
         from prompts.empathise.persona import PERSONA_PROMPT
 
+        research_section = self._format_research_data(research_data_list)
+
         user_prompt = f"""
-        Create a detailed user persona for:
+        **Project Context:**
         Project: {project['name']}
         Area: {project['area']}
         Goal: {project['goal']}
+        {research_section}
+        **Your Task:**
+        Based on the uploaded research data, create a detailed user persona including:
+        - Name, demographics, and background
+        - Goals and motivations
+        - Frustrations and pain points
+        - Behaviors and habits
+        - Needs and desires
 
-        Include: name, demographics, goals, frustrations, behaviors, and motivations.
+        Base the persona on real insights from the research data provided.
         """
 
         return self._call_openai(PERSONA_PROMPT, user_prompt)
 
-    def create_journey_map(self, project: Dict[str, Any]) -> str:
+    def create_journey_map(self, project: Dict[str, Any], research_data_list: list = None) -> str:
         """Create user journey map"""
-        system_prompt = "You are an expert in creating user journey maps for design thinking."
+        system_prompt = "You are an expert in creating user journey maps for design thinking. Base your analysis on real user research data."
+
+        research_section = self._format_research_data(research_data_list)
 
         user_prompt = f"""
-        Create a user journey map for:
+        **Project Context:**
         Project: {project['name']}
         Area: {project['area']}
         Goal: {project['goal']}
+        {research_section}
+        **Your Task:**
+        Based on the research data, create a user journey map with stages: Awareness, Consideration, Decision, Experience, Post-Experience
 
-        Include stages: Awareness, Consideration, Decision, Experience, Post-Experience
         For each stage include: actions, thoughts, emotions, pain points, opportunities.
+        Ground your insights in the uploaded research data.
         """
 
         return self._call_openai(system_prompt, user_prompt)
 
-    def create_affinity_map(self, project: Dict[str, Any]) -> str:
+    def create_affinity_map(self, project: Dict[str, Any], research_data_list: list = None) -> str:
         """Create affinity map from insights"""
         system_prompt = "You are an expert in synthesizing research insights using affinity mapping."
 
+        research_section = self._format_research_data(research_data_list)
+
         user_prompt = f"""
-        Create an affinity map organizing insights for:
+        **Project Context:**
         Project: {project['name']}
         Area: {project['area']}
         Goal: {project['goal']}
+        {research_section}
+        **Your Task:**
+        Analyze the research data above and create an affinity map by:
+        1. Identifying key insights and observations from the data
+        2. Grouping related insights into themes
+        3. Naming each theme clearly
+        4. Providing key findings for each theme
 
-        Group insights into themes and provide key findings for each theme.
+        Base everything on the actual research data provided.
         """
 
         return self._call_openai(system_prompt, user_prompt)
 
-    def create_user_story(self, project: Dict[str, Any]) -> str:
+    def create_user_story(self, project: Dict[str, Any], research_data_list: list = None) -> str:
         """Create user story narrative"""
-        system_prompt = "You are an expert storyteller for user-centered design."
+        system_prompt = "You are an expert storyteller for user-centered design who creates narratives based on real user research."
+
+        research_section = self._format_research_data(research_data_list)
 
         user_prompt = f"""
-        Create a compelling user story for:
+        **Project Context:**
         Project: {project['name']}
         Area: {project['area']}
         Goal: {project['goal']}
+        {research_section}
+        **Your Task:**
+        Based on the research data, create a compelling user story narrative that:
+        - Brings the user's experience to life
+        - Incorporates actual quotes and observations from the research
+        - Highlights key pain points and desires
+        - Makes the user's journey emotionally resonant
 
-        Write a narrative that brings the user's experience to life.
+        Ground your story in the real data provided.
         """
 
         return self._call_openai(system_prompt, user_prompt)
 
-    def create_stakeholder_map(self, project: Dict[str, Any]) -> str:
+    def create_stakeholder_map(self, project: Dict[str, Any], research_data_list: list = None) -> str:
         """Create stakeholder map"""
-        system_prompt = "You are an expert in stakeholder analysis."
+        system_prompt = "You are an expert in stakeholder analysis for design thinking projects."
+
+        research_section = self._format_research_data(research_data_list)
 
         user_prompt = f"""
-        Create a stakeholder map for:
+        **Project Context:**
         Project: {project['name']}
         Area: {project['area']}
         Goal: {project['goal']}
+        {research_section}
+        **Your Task:**
+        Based on the project context and research data, create a stakeholder map that identifies:
+        - All relevant stakeholders (users, decision-makers, influencers, etc.)
+        - Their interests and needs
+        - Their influence level (high/medium/low)
+        - Relationships between stakeholders
+        - Potential concerns or blockers
 
-        Identify all stakeholders, their interests, influence level, and relationships.
+        Use insights from the research data where applicable.
         """
 
         return self._call_openai(system_prompt, user_prompt)
