@@ -49,58 +49,57 @@ def open_brainstorming_dialog(project):
         BrainstormIdea.idea_type.like('seed_%')
     ).order_by(BrainstormIdea.order_index).all()
 
-    # Session 1: Pre-brainstorm Seed Ideas
-    st.markdown("# 💡 Pre-brainstorm Seed Ideas")
+    # Create tabs for the two brainstorming sessions
+    tab1, tab2 = st.tabs(["💡 Pre-brainstorm Seed Ideas", "🚀 Real-time Idea Expansion"])
 
-    if not existing_seeds:
-        # Check if Define stage is completed
-        if not define_summary:
-            st.warning("⚠️ Please complete the Define stage first!")
-            st.info("""
-            **To generate seed ideas, you need to:**
-            1. Go to the **Define** stage
-            2. Generate at least one analysis (Empathy Map, Persona, Journey Map, etc.)
-            """)
+    # Tab 1: Pre-brainstorm Seed Ideas
+    with tab1:
+        if not existing_seeds:
+            # Check if Define stage is completed
+            if not define_summary:
+                st.warning("⚠️ Please complete the Define stage first!")
+                st.info("""
+                **To generate seed ideas, you need to:**
+                1. Go to the **Define** stage
+                2. Generate at least one analysis (Empathy Map, Persona, Journey Map, etc.)
+                """)
+            else:
+                if st.button("✨ Generate Seed Ideas", type="primary", use_container_width=True):
+                    generate_seed_ideas(project.id)
+                    db.close()
+                    st.rerun()
         else:
-            if st.button("✨ Generate Seed Ideas", type="primary", use_container_width=True):
-                generate_seed_ideas(project.id)
+            # Display existing seed ideas
+            display_seed_ideas(existing_seeds)
+
+    # Tab 2: Real-time Idea Expansion
+    with tab2:
+        # Get existing expansions
+        expansions = db.query(BrainstormIdea).filter(
+            BrainstormIdea.project_id == project.id,
+            BrainstormIdea.idea_type == 'expansion'
+        ).order_by(BrainstormIdea.created_at).all()
+
+        # Display existing expansions
+        for expansion in expansions:
+            with st.expander(f"💭 {expansion.parent.idea_text if expansion.parent else 'Idea'}", expanded=False):
+                st.markdown(expansion.idea_text)
+
+        # New expansion input
+        user_idea = st.text_input(
+            "Enter your idea to expand:",
+            key="new_idea_input",
+            placeholder="Type your idea here..."
+        )
+
+        if st.button("🔍 Expand It", key="expand_new_idea", use_container_width=True):
+            if user_idea.strip():
+                expand_idea(project.id, user_idea)
                 db.close()
                 st.rerun()
-    else:
-        # Display existing seed ideas
-        display_seed_ideas(existing_seeds)
-    
-    st.divider()
-    
-    # Session 2: Real-time Idea Expansion
-    st.markdown("# 🚀 Real-time Idea Expansion")
-    
-    # Get existing expansions
-    expansions = db.query(BrainstormIdea).filter(
-        BrainstormIdea.project_id == project.id,
-        BrainstormIdea.idea_type == 'expansion'
-    ).order_by(BrainstormIdea.created_at).all()
-    
-    # Display existing expansions
-    for expansion in expansions:
-        with st.expander(f"💭 {expansion.parent.idea_text if expansion.parent else 'Idea'}", expanded=False):
-            st.markdown(expansion.idea_text)
-    
-    # New expansion input
-    user_idea = st.text_input(
-        "Enter your idea to expand:",
-        key="new_idea_input",
-        placeholder="Type your idea here..."
-    )
-    
-    if st.button("🔍 Expand It", key="expand_new_idea", use_container_width=True):
-        if user_idea.strip():
-            expand_idea(project.id, user_idea)
-            db.close()
-            st.rerun()
-        else:
-            st.warning("Please enter an idea first")
-    
+            else:
+                st.warning("Please enter an idea first")
+
     db.close()
 
 def display_seed_ideas(seeds):
