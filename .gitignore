@@ -48,6 +48,7 @@ data/uploads/*
 !data/uploads/.gitkeep
 data/exports/*
 !data/exports/.gitkeep
+uploads/
 
 # Logs
 logs/
