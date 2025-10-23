@@ -55,7 +55,6 @@ Your task is to analyze research data, identify individual insights, and group t
 **Output Format:**
 Present the affinity map in a clear, structured markdown format:
 
-```markdown
 ## Theme 1: [Clear Theme Name]
 
 **Key Insights:**
@@ -85,7 +84,6 @@ Present the affinity map in a clear, structured markdown format:
 
 **Recommendations:**
 - [Key actions based on the affinity mapping]
-```
 
 **Note:** Aim for 5-8 major themes. If you have more than 10, consider consolidating related themes.
 """

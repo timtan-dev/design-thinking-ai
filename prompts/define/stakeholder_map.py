@@ -94,7 +94,6 @@ Identify key relationships:
 
 **Output Format:**
 
-```markdown
 # Stakeholder Map for [Project Name]
 
 ## Executive Summary
@@ -190,7 +189,6 @@ Identify key relationships:
 ## Key Insights
 - [Important patterns or observations about stakeholder landscape]
 - [Critical success factors related to stakeholder management]
-```
 
 **Note:** Focus on actionable insights that will help the team navigate stakeholder dynamics successfully.
 """
