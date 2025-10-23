@@ -1,0 +1,1 @@
+"""Ideate stage prompts"""
