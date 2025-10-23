@@ -67,33 +67,85 @@ def open_method_dialog(project, method_key, method_name):
     st.divider()
 
     # Template generation section
-    if method_key == "interview":
-        st.markdown("### 📝 Generate AI Template")
-        generate_template(method_key, method_name, project)
-    else:
-        # Simple download for other methods
-        template_content = f"# {method_name} Template\nAdd your notes here..."
-        st.download_button(
-            label="📥 Download Template",
-            data=template_content,
-            file_name=f"{method_key}_template.md",
-            mime="text/markdown",
-            use_container_width=True
-        )
+    st.markdown("### 📝 Generate AI Template")
+    generate_template(method_key, method_name, project)
 
 
 
 def generate_template(method_type, method_name, project):
-    """Generate AI-powered template for interview research method"""
-    from prompts.empathise.interview import INTERVIEW_SCRIPT_TEMPLATE_PROMPT
+    """Generate AI-powered template for research methods"""
 
-    # Get user preferences - these are always shown
-    tone_options = ["conversational", "formal", "inspirational", "journalistic"]
-    interview_type = st.selectbox(
-        "Interview Type",
-        ["podcast", "video interview", "journalistic interview", "academic interview", "corporate interview"],
-        key=f"interview_type_{method_type}"
-    )
+    # Import the appropriate prompt based on method type
+    if method_type == "interview":
+        from prompts.empathise.interview import INTERVIEW_SCRIPT_TEMPLATE_PROMPT as TEMPLATE_PROMPT
+    elif method_type == "survey":
+        from prompts.empathise.survey import SURVEY_TEMPLATE_PROMPT as TEMPLATE_PROMPT
+    elif method_type == "ethnography":
+        from prompts.empathise.ethnography import ETHNOGRAPHY_TEMPLATE_PROMPT as TEMPLATE_PROMPT
+    elif method_type == "focus_group":
+        from prompts.empathise.focus_group import FOCUS_GROUP_TEMPLATE_PROMPT as TEMPLATE_PROMPT
+    elif method_type == "observation":
+        from prompts.empathise.observation import OBSERVATION_TEMPLATE_PROMPT as TEMPLATE_PROMPT
+    elif method_type == "diary_study":
+        from prompts.empathise.diary_study import DIARY_STUDY_TEMPLATE_PROMPT as TEMPLATE_PROMPT
+    else:
+        st.error(f"Template generation not configured for {method_name}")
+        return
+
+    # Get user preferences based on method type
+    tone_options = ["conversational", "formal", "professional", "friendly"]
+
+    # Method-specific options
+    if method_type == "interview":
+        interview_type = st.selectbox(
+            "Interview Type",
+            ["podcast", "video interview", "journalistic interview", "academic interview", "corporate interview"],
+            key=f"interview_type_{method_type}"
+        )
+        additional_context = f"a {interview_type}"
+    elif method_type == "survey":
+        survey_length = st.selectbox(
+            "Survey Length",
+            ["short (5-10 questions)", "medium (15-20 questions)", "long (25-30 questions)"],
+            key=f"survey_length_{method_type}"
+        )
+        additional_context = f"{survey_length} survey"
+    elif method_type == "ethnography":
+        study_duration = st.selectbox(
+            "Study Duration",
+            ["1 week", "2 weeks", "1 month", "2-3 months"],
+            key=f"study_duration_{method_type}"
+        )
+        additional_context = f"ethnographic study lasting {study_duration}"
+    elif method_type == "focus_group":
+        group_size = st.selectbox(
+            "Group Size",
+            ["small (4-6 people)", "medium (6-8 people)", "large (8-10 people)"],
+            key=f"group_size_{method_type}"
+        )
+        additional_context = f"focus group with {group_size}"
+    elif method_type == "observation":
+        observation_type = st.selectbox(
+            "Observation Type",
+            ["participant observation", "non-participant observation", "structured observation", "naturalistic observation"],
+            key=f"observation_type_{method_type}"
+        )
+        additional_context = f"{observation_type} study"
+    elif method_type == "diary_study":
+        study_duration = st.selectbox(
+            "Study Duration",
+            ["1 week", "2 weeks", "3 weeks", "4 weeks"],
+            key=f"diary_duration_{method_type}"
+        )
+        entry_frequency = st.selectbox(
+            "Entry Frequency",
+            ["daily", "twice daily", "every other day", "weekly", "event-triggered"],
+            key=f"entry_freq_{method_type}"
+        )
+        additional_context = f"diary study lasting {study_duration} with {entry_frequency} entries"
+    else:
+        additional_context = method_name
+
     tone = st.selectbox(
         "Tone",
         tone_options,
@@ -101,23 +153,31 @@ def generate_template(method_type, method_name, project):
     )
 
     # Generate button
-    if st.button("✨ Generate Script Template", key=f"gen_btn_{method_type}", type="primary", use_container_width=True):
+    button_label = {
+        "interview": "✨ Generate Script Template",
+        "survey": "✨ Generate Survey Template",
+        "ethnography": "✨ Generate Study Guide",
+        "focus_group": "✨ Generate Discussion Guide",
+        "observation": "✨ Generate Observation Guide",
+        "diary_study": "✨ Generate Diary Study Guide"
+    }.get(method_type, "✨ Generate Template")
+
+    if st.button(button_label, key=f"gen_btn_{method_type}", type="primary", use_container_width=True):
         with st.spinner(f"Generating {method_name} template for {project.name}..."):
             ai_service = AIService()
 
             user_prompt = f"""
-            Generate a professional interview script template for a {interview_type}.
+            Generate a professional {method_name} template for {additional_context}.
             Tone: {tone}
 
-            The interview should help gather insights for the "{project.name}" project in the {project.area} space.
+            This {method_name} should help gather insights for the "{project.name}" project in the {project.area} space.
             The goal is: {project.goal}
 
-            Include all required sections: Introduction, Warm-up Questions, Main Discussion (with 3 topic placeholders), and Closing.
-            Make sure the questions are specifically tailored to uncover user needs, pain points, and behaviors related to this project.
+            Make sure the template is comprehensive, professionally structured, and specifically tailored to uncover user needs, pain points, and behaviors related to this project.
             """
 
             # Call AI service with project context
-            system_prompt = INTERVIEW_SCRIPT_TEMPLATE_PROMPT.format(
+            system_prompt = TEMPLATE_PROMPT.format(
                 project_name=project.name,
                 project_area=project.area,
                 project_goal=project.goal,
@@ -125,7 +185,7 @@ def generate_template(method_type, method_name, project):
             )
             template_content = ai_service._call_openai(system_prompt, user_prompt)
 
-            # Open dialog to show generated template
+            # Show generated template
             show_generated_template(method_name, template_content, method_type, project)
 
 def show_generated_template(method_name, template_content, method_type, project):
@@ -148,10 +208,20 @@ def show_generated_template(method_name, template_content, method_type, project)
             st.info("💡 This template is customized for your project and ready to use. It is not saved to the database.")
 
         with col2:
+            # Generate appropriate filename based on method type
+            file_suffix = {
+                "interview": "script",
+                "survey": "survey",
+                "ethnography": "guide",
+                "focus_group": "discussion_guide",
+                "observation": "observation_guide",
+                "diary_study": "diary_guide"
+            }.get(method_type, "template")
+
             st.download_button(
                 label="📥 Download Template",
                 data=template_content,
-                file_name=f"{project.name.lower().replace(' ', '_')}_{method_type}_script_template.md",
+                file_name=f"{project.name.lower().replace(' ', '_')}_{method_type}_{file_suffix}.md",
                 mime="text/markdown",
                 use_container_width=True,
                 type="primary"
