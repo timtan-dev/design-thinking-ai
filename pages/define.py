@@ -81,11 +81,15 @@ def open_analysis_dialog(project, method_key, method_name, research_data):
     if existing_content:
         st.markdown(f"**{len(existing_content)} Existing Analysis** {'Results' if len(existing_content) > 1 else 'Result'}")
 
+        total_count = len(existing_content)
         for idx, content in enumerate(existing_content, 1):
             # Format timestamp in local timezone
             created_time = format_local_time(content.created_at)
 
-            with st.expander(f"📄 Analysis #{idx} - Generated on {created_time}", expanded=(idx == 1)):
+            # Display number in descending order (newest = highest number)
+            display_number = total_count - idx + 1
+
+            with st.expander(f"📄 Analysis #{display_number} - Generated on {created_time}", expanded=(idx == 1)):
                 st.markdown(content.content)
 
                 # Add download button
