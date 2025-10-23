@@ -94,3 +94,39 @@ class Template(Base):
 
     def __repr__(self):
         return f"<Template(method='{self.method_type}', version='{self.version}')>"
+
+class StageSummary(Base):
+    """AI-generated summaries for each stage"""
+    __tablename__ = "stage_summaries"
+
+    id = Column(Integer, primary_key=True, index=True)
+    project_id = Column(Integer, ForeignKey("projects.id"), nullable=False)
+    stage = Column(String(50), nullable=False)  # empathise, define, ideate, etc.
+    summary_text = Column(Text, nullable=False)
+    version = Column(Integer, default=1)  # Auto-increment for each new summary
+    created_at = Column(DateTime, default=datetime.utcnow)
+
+    # Relationships
+    project = relationship("Project")
+
+    def __repr__(self):
+        return f"<StageSummary(project_id={self.project_id}, stage='{self.stage}', version={self.version})>"
+
+class BrainstormIdea(Base):
+    """Brainstorming ideas - both seed ideas and expansions"""
+    __tablename__ = "brainstorm_ideas"
+
+    id = Column(Integer, primary_key=True, index=True)
+    project_id = Column(Integer, ForeignKey("projects.id"), nullable=False)
+    idea_type = Column(String(50), nullable=False)  # seed_practical, seed_bold, seed_wild, expansion
+    idea_text = Column(Text, nullable=False)
+    parent_id = Column(Integer, ForeignKey("brainstorm_ideas.id"), nullable=True)  # For expansions
+    order_index = Column(Integer, default=0)  # For maintaining order
+    created_at = Column(DateTime, default=datetime.utcnow)
+
+    # Relationships
+    project = relationship("Project")
+    parent = relationship("BrainstormIdea", remote_side=[id], backref="expansions")
+
+    def __repr__(self):
+        return f"<BrainstormIdea(id={self.id}, type='{self.idea_type}', project_id={self.project_id})>"
