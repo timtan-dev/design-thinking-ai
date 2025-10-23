@@ -33,8 +33,8 @@ Generate exactly 15 solution ideas organized into 3 categories:
 - Format: Brief bullet point (<5 words) + Description (<15 words)
 
 **Output Format:**
-Use clear bullet points with this structure ("Idea Title" Bold)
-- Idea Title: Brief description
+Use clear bullet points with this structure (make "Idea Title" bold):
+- **Idea Title:** Brief description
 
 **Guidelines:**
 - Each idea should be distinct and actionable
