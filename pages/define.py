@@ -103,6 +103,24 @@ def open_analysis_dialog(project, method_key, method_name, research_data):
 
 def generate_analysis(project_id, content_type, content_name, research_data):
     """Generate AI-powered analysis using uploaded research data"""
+
+    # Import the appropriate prompt based on content type
+    if content_type == "empathy_map":
+        from prompts.define.empathy_map import EMPATHY_MAP_PROMPT as ANALYSIS_PROMPT
+    elif content_type == "persona":
+        from prompts.define.persona import PERSONA_PROMPT as ANALYSIS_PROMPT
+    elif content_type == "journey_map":
+        from prompts.define.journey_map import JOURNEY_MAP_PROMPT as ANALYSIS_PROMPT
+    elif content_type == "affinity_map":
+        from prompts.define.affinity_map import AFFINITY_MAP_PROMPT as ANALYSIS_PROMPT
+    elif content_type == "storytelling":
+        from prompts.define.storytelling import STORYTELLING_PROMPT as ANALYSIS_PROMPT
+    elif content_type == "stakeholder_map":
+        from prompts.define.stakeholder_map import STAKEHOLDER_MAP_PROMPT as ANALYSIS_PROMPT
+    else:
+        st.error(f"Unknown analysis type: {content_type}")
+        return
+
     db = get_db()
 
     try:
@@ -117,46 +135,29 @@ def generate_analysis(project_id, content_type, content_name, research_data):
             # Initialize AI service
             ai_service = AIService()
 
-            # Format research data for AI service
-            research_data_list = []
-            for data in research_data:
-                research_data_list.append({
-                    'method_type': data.method_type,
-                    'file_content': data.file_content,
-                    'file_path': data.file_path
-                })
+            # Format research data
+            research_section = ""
+            if research_data:
+                research_section = "\n**Research Data:**\n"
+                for idx, data in enumerate(research_data, 1):
+                    method_name = data.method_type.replace('_', ' ').title()
+                    research_section += f"\n--- {method_name} Data {idx} ---\n"
+                    research_section += f"{data.file_content[:5000]}\n"  # Limit to first 5000 chars per file
 
-            # Prepare project dict for AI service
-            project_dict = {
-                'name': project.name,
-                'area': project.area,
-                'goal': project.goal
-            }
+            # Build user prompt
+            user_prompt = f"""
+            **Project Context:**
+            Project: {project.name}
+            Area: {project.area}
+            Goal: {project.goal}
+            {research_section}
 
-            # Generate content based on type
-            generated_content = None
+            Generate a comprehensive {content_name.lower()} based on the research data provided above.
+            Include specific references to the research data sources.
+            """
 
-            if content_type == "empathy_map":
-                generated_content = ai_service.create_empathy_map(project_dict, research_data_list)
-
-            elif content_type == "persona":
-                generated_content = ai_service.create_persona(project_dict, research_data_list)
-
-            elif content_type == "journey_map":
-                generated_content = ai_service.create_journey_map(project_dict, research_data_list)
-
-            elif content_type == "affinity_map":
-                generated_content = ai_service.create_affinity_map(project_dict, research_data_list)
-
-            elif content_type == "storytelling":
-                generated_content = ai_service.create_user_story(project_dict, research_data_list)
-
-            elif content_type == "stakeholder_map":
-                generated_content = ai_service.create_stakeholder_map(project_dict, research_data_list)
-
-            else:
-                st.error(f"Unknown analysis type: {content_type}")
-                return
+            # Call AI service
+            generated_content = ai_service._call_openai(ANALYSIS_PROMPT, user_prompt)
 
             if not generated_content:
                 st.error("Failed to generate content. Please try again.")
