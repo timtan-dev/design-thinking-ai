@@ -2,6 +2,8 @@ import streamlit as st
 from config.database import get_db
 from database.models import GeneratedContent, ResearchData, Project
 from services.ai_service import AIService
+from datetime import datetime
+import pytz
 
 ANALYSIS_METHODS = {
     "empathy_map": {"name": "Empathy Map", "icon": "🧩"},
@@ -11,6 +13,16 @@ ANALYSIS_METHODS = {
     "storytelling": {"name": "Storytelling", "icon": "📚"},
     "stakeholder_map": {"name": "Stakeholder Map", "icon": "🌐"}
 }
+
+def format_local_time(utc_datetime):
+    """Convert UTC datetime to local timezone and format it"""
+    if utc_datetime.tzinfo is None:
+        # Assume UTC if no timezone info
+        utc_datetime = utc_datetime.replace(tzinfo=pytz.UTC)
+
+    # Convert to local timezone
+    local_datetime = utc_datetime.astimezone()
+    return local_datetime.strftime("%Y-%m-%d %H:%M")
 
 def render_define_page(project):
     db = get_db()
@@ -70,8 +82,8 @@ def open_analysis_dialog(project, method_key, method_name, research_data):
         st.markdown(f"**{len(existing_content)} Existing Analysis** {'Results' if len(existing_content) > 1 else 'Result'}")
 
         for idx, content in enumerate(existing_content, 1):
-            # Format timestamp
-            created_time = content.created_at.strftime("%Y-%m-%d %H:%M")
+            # Format timestamp in local timezone
+            created_time = format_local_time(content.created_at)
 
             with st.expander(f"📄 Analysis #{idx} - Generated on {created_time}", expanded=(idx == 1)):
                 st.markdown(content.content)
