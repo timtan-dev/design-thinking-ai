@@ -1,6 +1,6 @@
 import streamlit as st
 from config.database import get_db
-from database.models import GeneratedContent, ResearchData, Project
+from database.models import GeneratedContent, ResearchData, Project, StageSummary
 from services.ai_service import AIService
 from datetime import datetime
 import pytz
@@ -23,6 +23,82 @@ def format_local_time(utc_datetime):
     # Convert to local timezone
     local_datetime = utc_datetime.astimezone()
     return local_datetime.strftime("%Y-%m-%d %H:%M")
+
+def generate_stage_summary(project_id):
+    """
+    Automatically generate Define stage summary from latest analyses.
+    Called silently after each new analysis is generated.
+    """
+    db = get_db()
+    try:
+        # Get project
+        project = db.query(Project).filter(Project.id == project_id).first()
+        if not project:
+            return
+
+        # Get latest analysis for each method type
+        latest_analyses = {}
+        for method_key in ANALYSIS_METHODS.keys():
+            latest = db.query(GeneratedContent).filter(
+                GeneratedContent.project_id == project_id,
+                GeneratedContent.content_type == method_key
+            ).order_by(GeneratedContent.created_at.desc()).first()
+
+            if latest:
+                latest_analyses[method_key] = latest.content
+
+        # Only generate summary if we have at least one analysis
+        if not latest_analyses:
+            return
+
+        # Format analyses for prompt
+        analyses_text = ""
+        for method_key, content in latest_analyses.items():
+            method_name = ANALYSIS_METHODS[method_key]["name"]
+            analyses_text += f"\n**{method_name}:**\n{content[:1000]}\n\n"  # Limit each to 1000 chars
+
+        # Generate summary using AI
+        from prompts.summary import DEFINE_STAGE_SUMMARY_PROMPT
+        ai_service = AIService()
+
+        user_prompt = f"""
+        Analyze and synthesize the following Define stage analyses into a problem statement.
+
+        **Analyses Available:**
+        {analyses_text}
+        """
+
+        system_prompt = DEFINE_STAGE_SUMMARY_PROMPT.format(
+            project_name=project.name,
+            project_area=project.area,
+            project_goal=project.goal,
+            define_analyses=analyses_text
+        )
+
+        summary_text = ai_service._call_openai(system_prompt, user_prompt)
+
+        if summary_text:
+            # Get current version number
+            current_version = db.query(StageSummary).filter(
+                StageSummary.project_id == project_id,
+                StageSummary.stage == "define"
+            ).count() + 1
+
+            # Save summary to database
+            new_summary = StageSummary(
+                project_id=project_id,
+                stage="define",
+                summary_text=summary_text,
+                version=current_version
+            )
+            db.add(new_summary)
+            db.commit()
+
+    except Exception as e:
+        # Silently fail - don't interrupt user experience
+        print(f"Error generating stage summary: {str(e)}")
+    finally:
+        db.close()
 
 def render_define_page(project):
     db = get_db()
@@ -187,6 +263,9 @@ def generate_analysis(project_id, content_type, content_name, research_data):
             )
             db.add(new_content)
             db.commit()
+
+            # Auto-generate stage summary in background (silent)
+            generate_stage_summary(project_id)
 
             st.success(f"✅ {content_name} generated successfully!")
 
