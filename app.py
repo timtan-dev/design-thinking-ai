@@ -11,6 +11,7 @@ from utils.session_manager import initialize_session_state
 from utils.project_tabs import render_project_header, render_stage_tabs, update_project_stage
 from pages.empathise import render_empathise_page
 from pages.define import render_define_page
+from pages.ideate import render_ideate_page
 
 import os
 
@@ -219,7 +220,7 @@ def main():
         elif current_stage == 2:
             render_define_page(current_project)
         elif current_stage == 3:
-            render_placeholder_stage("Ideate")
+            render_ideate_page(current_project)
         elif current_stage == 4:
             render_placeholder_stage("Prototype")
         elif current_stage == 5:
