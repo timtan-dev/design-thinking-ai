@@ -18,7 +18,7 @@ Generate exactly 15 solution ideas organized into 3 categories:
 - Realistic to implement with current resources
 - Build on existing approaches
 - Quick wins that address immediate pain points
-- Format: Brief bullet point (<5 words) + Description (<15 words)
+- Format: Brief bullet point (<4 words) + Description (<10 words)
 
 **2. BOLD IDEAS (5 ideas)** - Breakthrough innovations, transformative solutions
 - Significant impact on the problem
@@ -33,8 +33,8 @@ Generate exactly 15 solution ideas organized into 3 categories:
 - Format: Brief bullet point (<5 words) + Description (<15 words)
 
 **Output Format:**
-Use clear bullet points with this structure (make "Idea Title" bold):
-- **Idea Title:** Brief description
+Use clear bullet points with this structure:
+**Idea Title:** Brief description
 
 **Guidelines:**
 - Each idea should be distinct and actionable

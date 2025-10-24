@@ -51,7 +51,7 @@ def open_brainstorming_dialog(project):
     ).order_by(BrainstormIdea.order_index).all()
 
     # Create tabs for the three brainstorming sessions
-    tab1, tab2, tab3 = st.tabs(["💡 Pre-brainstorm Seed Ideas", "🚀 Real-time Idea Expansion", "🗂️ Idea Categorization"])
+    tab1, tab2, tab3 = st.tabs(["💡 Pre-brainstorm", "🚀 Idea Expansion", "🗂️ Idea Categorization"])
 
     # Tab 1: Pre-brainstorm Seed Ideas
     with tab1:
