@@ -130,3 +130,19 @@ class BrainstormIdea(Base):
 
     def __repr__(self):
         return f"<BrainstormIdea(id={self.id}, type='{self.idea_type}', project_id={self.project_id})>"
+
+class IdeaCategorization(Base):
+    """AI-generated categorization of brainstorming ideas"""
+    __tablename__ = "idea_categorizations"
+
+    id = Column(Integer, primary_key=True, index=True)
+    project_id = Column(Integer, ForeignKey("projects.id"), nullable=False)
+    categorization_text = Column(Text, nullable=False)  # Brief categorization result
+    created_at = Column(DateTime, default=datetime.utcnow)
+    updated_at = Column(DateTime, default=datetime.utcnow, onupdate=datetime.utcnow)
+
+    # Relationships
+    project = relationship("Project")
+
+    def __repr__(self):
+        return f"<IdeaCategorization(id={self.id}, project_id={self.project_id})>"

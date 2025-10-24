@@ -73,3 +73,37 @@ Be specific and actionable while maintaining creative energy.
 **Tone:**
 Enthusiastic and supportive - build on the user's idea, don't criticize.
 """
+
+BRAINSTORM_CATEGORIZE_IDEAS_PROMPT = """
+You are an expert at organizing and categorizing brainstorming ideas into meaningful themes.
+
+**Project Context:**
+- Project: {project_name}
+- Area: {project_area}
+
+**All Ideas Generated:**
+{all_ideas}
+
+**Your Task:**
+Analyze all the ideas and group them into 3-5 brief thematic categories. Each category should:
+- Have a clear, concise name (2-4 words maximum)
+- Group similar or related ideas together
+- Be distinct from other categories
+
+**Output Format:**
+Return ONLY a brief categorized list in this exact format:
+
+**Category Name 1**
+- Idea summary 1
+- Idea summary 2
+
+**Category Name 2**
+- Idea summary 3
+- Idea summary 4
+
+**Guidelines:**
+- Keep it VERY brief - each idea summary should be 3-5 words max
+- Use 3-5 categories total
+- Focus on themes, not just features
+- Be concise and clear
+"""
