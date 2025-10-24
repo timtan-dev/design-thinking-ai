@@ -56,29 +56,44 @@ def open_brainstorming_dialog(project):
 
     # Tab 1: Pre-brainstorm Seed Ideas
     with tab1:
-        if not existing_seeds:
-            # Check if Define stage is completed
-            if not define_summary:
-                st.warning("⚠️ Please complete the Define stage first!")
-                st.info("""
-                **To generate seed ideas, you need to:**
-                1. Go to the **Define** stage
-                2. Generate at least one analysis (Empathy Map, Persona, Journey Map, etc.)
-                """)
+        # Check if Define stage is completed
+        if not define_summary:
+            st.warning("⚠️ Please complete the Define stage first!")
+            st.info("""
+            **To generate seed ideas, you need to:**
+            1. Go to the **Define** stage
+            2. Generate at least one analysis (Empathy Map, Persona, Journey Map, etc.)
+            """)
+        else:
+            # Show timestamp and regenerate button if seeds exist
+            if existing_seeds:
+                latest_seed = max(existing_seeds, key=lambda x: x.created_at)
+
+                # Create two columns for timestamp and button
+                col1, col2 = st.columns([3, 1])
+                with col1:
+                    st.markdown(f"<small style='color: gray;'>Last updated: {format_local_time(latest_seed.created_at)}</small>", unsafe_allow_html=True)
+                with col2:
+                    if st.button("🔄 Regenerate", key="regenerate_seeds", type="secondary", use_container_width=True):
+                        # Delete existing seeds before regenerating
+                        db.query(BrainstormIdea).filter(
+                            BrainstormIdea.project_id == project.id,
+                            BrainstormIdea.idea_type.like('seed_%')
+                        ).delete()
+                        db.commit()
+                        generate_seed_ideas(project.id)
+                        db.close()
+                        st.rerun()
+
+                st.markdown("")
+                # Display existing seed ideas
+                display_seed_ideas(existing_seeds)
             else:
+                # No seeds yet - show generate button
                 if st.button("✨ Generate Seed Ideas", type="primary", use_container_width=True):
                     generate_seed_ideas(project.id)
                     db.close()
                     st.rerun()
-        else:
-            # Show timestamp
-            if existing_seeds:
-                latest_seed = max(existing_seeds, key=lambda x: x.created_at)
-                st.markdown(f"<small style='color: gray;'>Last updated: {format_local_time(latest_seed.created_at)}</small>", unsafe_allow_html=True)
-                st.markdown("")
-
-            # Display existing seed ideas
-            display_seed_ideas(existing_seeds)
 
     # Tab 2: Real-time Idea Expansion
     with tab2:
