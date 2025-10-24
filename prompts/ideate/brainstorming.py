@@ -86,6 +86,7 @@ You are an expert at organizing and categorizing brainstorming ideas into meanin
 
 **Your Task:**
 Analyze all the ideas and group them into 1-5 brief thematic categories. Each category should:
+- Have 1-5 Idea summary
 - Have a clear, concise name (2-4 words maximum)
 - Group similar or related ideas together
 - Be distinct from other categories
@@ -96,10 +97,11 @@ Return ONLY a brief categorized list in this exact format:
 **Category Name 1**
 - Idea summary 1
 - Idea summary 2
+- Idea summary 3
 
 **Category Name 2**
-- Idea summary 3
 - Idea summary 4
+- Idea summary 5
 
 **Guidelines:**
 - Keep it VERY brief - each idea summary should be 3-5 words max
