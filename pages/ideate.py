@@ -277,12 +277,8 @@ def categorize_ideas(project_id):
         # Format all ideas for the prompt
         ideas_text = ""
         for idea in all_ideas:
-            if idea.idea_type.startswith('seed_'):
+            if idea.idea_type in ('user_input', 'expansion'):
                 ideas_text += f"- {idea.idea_text}\n"
-            elif idea.idea_type == 'expansion':
-                # Get first line or first 100 chars
-                first_line = idea.idea_text.split('\n')[0][:100]
-                ideas_text += f"- {first_line}\n"
 
         ai_service = AIService()
 
