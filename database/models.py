@@ -146,3 +146,72 @@ class IdeaCategorization(Base):
 
     def __repr__(self):
         return f"<IdeaCategorization(id={self.id}, project_id={self.project_id})>"
+
+class PrototypePage(Base):
+    """Represents one page being prototyped (e.g., Home, Profile, Settings)"""
+    __tablename__ = "prototype_pages"
+
+    id = Column(Integer, primary_key=True, index=True)
+    project_id = Column(Integer, ForeignKey("projects.id"), nullable=False)
+    page_name = Column(String(100), nullable=False)
+    order_index = Column(Integer, default=0)
+
+    # Progress tracking
+    sketch_finalized = Column(Boolean, default=False)
+    final_sketch_id = Column(Integer, nullable=True)
+
+    mockup_finalized = Column(Boolean, default=False)
+    final_mockup_id = Column(Integer, nullable=True)
+
+    code_generated = Column(Boolean, default=False)
+    html_code = Column(Text, nullable=True)
+    css_code = Column(Text, nullable=True)
+
+    created_at = Column(DateTime, default=datetime.utcnow)
+    updated_at = Column(DateTime, default=datetime.utcnow, onupdate=datetime.utcnow)
+
+    # Relationships
+    project = relationship("Project")
+    sketch_iterations = relationship("SketchIteration", back_populates="prototype_page", cascade="all, delete-orphan")
+    mockup_iterations = relationship("MockupIteration", back_populates="prototype_page", cascade="all, delete-orphan")
+
+    def __repr__(self):
+        return f"<PrototypePage(id={self.id}, page_name='{self.page_name}', project_id={self.project_id})>"
+
+class SketchIteration(Base):
+    """Each sketch upload/iteration for vision analysis"""
+    __tablename__ = "sketch_iterations"
+
+    id = Column(Integer, primary_key=True, index=True)
+    prototype_page_id = Column(Integer, ForeignKey("prototype_pages.id"), nullable=False)
+    iteration_number = Column(Integer, nullable=False)
+    image_path = Column(Text, nullable=False)
+    user_instructions = Column(Text, nullable=True)
+    ai_analysis = Column(Text, nullable=True)
+    ai_suggestions = Column(Text, nullable=True)
+    created_at = Column(DateTime, default=datetime.utcnow)
+
+    # Relationships
+    prototype_page = relationship("PrototypePage", back_populates="sketch_iterations")
+
+    def __repr__(self):
+        return f"<SketchIteration(id={self.id}, iteration={self.iteration_number}, page_id={self.prototype_page_id})>"
+
+class MockupIteration(Base):
+    """Each AI-generated mockup iteration"""
+    __tablename__ = "mockup_iterations"
+
+    id = Column(Integer, primary_key=True, index=True)
+    prototype_page_id = Column(Integer, ForeignKey("prototype_pages.id"), nullable=False)
+    iteration_number = Column(Integer, nullable=False)
+    image_url = Column(Text, nullable=False)  # URL or path to generated image
+    generation_prompt = Column(Text, nullable=False)
+    style_params = Column(JSON, nullable=True)  # {style: "minimalist", color: "blue", etc.}
+    user_refinement = Column(Text, nullable=True)  # User's refinement instructions
+    created_at = Column(DateTime, default=datetime.utcnow)
+
+    # Relationships
+    prototype_page = relationship("PrototypePage", back_populates="mockup_iterations")
+
+    def __repr__(self):
+        return f"<MockupIteration(id={self.id}, iteration={self.iteration_number}, page_id={self.prototype_page_id})>"
