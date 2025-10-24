@@ -69,12 +69,21 @@ def open_brainstorming_dialog(project):
             if existing_seeds:
                 latest_seed = max(existing_seeds, key=lambda x: x.created_at)
 
+                # Check if Define was updated after seeds were generated
+                define_updated_after_seeds = define_summary.created_at > latest_seed.created_at
+
                 # Create two columns for timestamp and button
                 col1, col2 = st.columns([3, 1])
                 with col1:
                     st.markdown(f"<small style='color: gray;'>Last updated: {format_local_time(latest_seed.created_at)}</small>", unsafe_allow_html=True)
+                    if define_updated_after_seeds:
+                        st.markdown(f"<small style='color: orange;'>⚠️ Define updated: {format_local_time(define_summary.created_at)}</small>", unsafe_allow_html=True)
                 with col2:
-                    if st.button("🔄 Regenerate", key="regenerate_seeds", type="secondary", use_container_width=True):
+                    # Show primary button if Define was updated, secondary otherwise
+                    button_type = "primary" if define_updated_after_seeds else "secondary"
+                    button_label = "🔄 Regenerate ⚠️" if define_updated_after_seeds else "🔄 Regenerate"
+
+                    if st.button(button_label, key="regenerate_seeds", type=button_type, use_container_width=True):
                         # Delete existing seeds before regenerating
                         db.query(BrainstormIdea).filter(
                             BrainstormIdea.project_id == project.id,
