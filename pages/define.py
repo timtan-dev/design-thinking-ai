@@ -3,7 +3,7 @@ from config.database import get_db
 from database.models import GeneratedContent, ResearchData, Project, StageSummary
 from services.ai_service import AIService
 from datetime import datetime
-import pytz
+from utils.time_utils import format_local_time
 
 ANALYSIS_METHODS = {
     "empathy_map": {"name": "Empathy Map", "icon": "🧩"},
@@ -13,16 +13,6 @@ ANALYSIS_METHODS = {
     "storytelling": {"name": "Storytelling", "icon": "📚"},
     "stakeholder_map": {"name": "Stakeholder Map", "icon": "🌐"}
 }
-
-def format_local_time(utc_datetime):
-    """Convert UTC datetime to local timezone and format it"""
-    if utc_datetime.tzinfo is None:
-        # Assume UTC if no timezone info
-        utc_datetime = utc_datetime.replace(tzinfo=pytz.UTC)
-
-    # Convert to local timezone
-    local_datetime = utc_datetime.astimezone()
-    return local_datetime.strftime("%Y-%m-%d %H:%M")
 
 def generate_stage_summary(project_id):
     """

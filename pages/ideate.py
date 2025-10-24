@@ -3,24 +3,13 @@ from config.database import get_db
 from database.models import BrainstormIdea, StageSummary, Project, IdeaCategorization
 from services.ai_service import AIService
 from datetime import datetime, timezone
-import pytz
+from utils.time_utils import format_local_time
 
 IDEATE_METHODS = {
     "brainstorming": {"name": "Brainstorming", "icon": "🧠"},
     "mind_mapping": {"name": "Mind Mapping", "icon": "🗺️"},
     "scamper": {"name": "SCAMPER", "icon": "🔧"}
 }
-
-def format_local_time(utc_time):
-    """Convert UTC datetime to local timezone and format"""
-    if not utc_time:
-        return ""
-    # Assume UTC time from database
-    utc_time = utc_time.replace(tzinfo=pytz.UTC)
-    # Convert to local timezone
-    local_tz = datetime.now().astimezone().tzinfo
-    local_time = utc_time.astimezone(local_tz)
-    return local_time.strftime("%Y-%m-%d %H:%M:%S")
 
 def render_ideate_page(project):
     st.markdown('<div style="margin-top: 2rem;"></div>', unsafe_allow_html=True)
