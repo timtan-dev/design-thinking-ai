@@ -2,13 +2,25 @@ import streamlit as st
 from config.database import get_db
 from database.models import BrainstormIdea, StageSummary, Project, IdeaCategorization
 from services.ai_service import AIService
-from datetime import datetime
+from datetime import datetime, timezone
+import pytz
 
 IDEATE_METHODS = {
     "brainstorming": {"name": "Brainstorming", "icon": "🧠"},
     "mind_mapping": {"name": "Mind Mapping", "icon": "🗺️"},
     "scamper": {"name": "SCAMPER", "icon": "🔧"}
 }
+
+def format_local_time(utc_time):
+    """Convert UTC datetime to local timezone and format"""
+    if not utc_time:
+        return ""
+    # Assume UTC time from database
+    utc_time = utc_time.replace(tzinfo=pytz.UTC)
+    # Convert to local timezone
+    local_tz = datetime.now().astimezone().tzinfo
+    local_time = utc_time.astimezone(local_tz)
+    return local_time.strftime("%Y-%m-%d %H:%M:%S")
 
 def render_ideate_page(project):
     st.markdown('<div style="margin-top: 2rem;"></div>', unsafe_allow_html=True)
@@ -70,6 +82,12 @@ def open_brainstorming_dialog(project):
                     db.close()
                     st.rerun()
         else:
+            # Show timestamp
+            if existing_seeds:
+                latest_seed = max(existing_seeds, key=lambda x: x.created_at)
+                st.markdown(f"<small style='color: gray;'>Last updated: {format_local_time(latest_seed.created_at)}</small>", unsafe_allow_html=True)
+                st.markdown("")
+
             # Display existing seed ideas
             display_seed_ideas(existing_seeds)
 
@@ -83,7 +101,9 @@ def open_brainstorming_dialog(project):
 
         # Display existing expansions
         for expansion in expansions:
-            with st.expander(f"💭 {expansion.parent.idea_text if expansion.parent else 'Idea'}", expanded=False):
+            idea_label = expansion.parent.idea_text if expansion.parent else 'Idea'
+            timestamp = format_local_time(expansion.created_at)
+            with st.expander(f"💭 {idea_label} | {timestamp}", expanded=False):
                 st.markdown(expansion.idea_text)
 
         # New expansion input
@@ -109,6 +129,8 @@ def open_brainstorming_dialog(project):
         ).order_by(IdeaCategorization.updated_at.desc()).first()
 
         if categorization:
+            st.markdown(f"<small style='color: gray;'>Last updated: {format_local_time(categorization.updated_at)}</small>", unsafe_allow_html=True)
+            st.markdown("")
             st.markdown(categorization.categorization_text)
         else:
             st.info("💡 Categorization will appear here automatically after you expand ideas.")
@@ -299,7 +321,7 @@ def categorize_ideas(project_id):
             if existing:
                 # Update existing
                 existing.categorization_text = categorization_result
-                existing.updated_at = datetime.utcnow()
+                existing.updated_at = datetime.now(timezone.utc)
             else:
                 # Create new
                 categorization = IdeaCategorization(
@@ -310,7 +332,7 @@ def categorize_ideas(project_id):
 
             db.commit()
 
-    except Exception as e:
+    except Exception:
         # Silent fail - categorization is optional
         pass
     finally:
