@@ -73,17 +73,18 @@ def open_brainstorming_dialog(project):
                 define_updated_after_seeds = define_summary.created_at > latest_seed.created_at
 
                 # Create two columns for timestamp and button
-                col1, col2 = st.columns([3, 1])
-                with col1:
-                    st.markdown(f"<small style='color: gray;'>Last updated: {format_local_time(latest_seed.created_at)}</small>", unsafe_allow_html=True)
-                    if define_updated_after_seeds:
-                        st.markdown(f"<small style='color: orange;'>⚠️ Define updated: {format_local_time(define_summary.created_at)}</small>", unsafe_allow_html=True)
-                with col2:
-                    # Show primary button if Define was updated, secondary otherwise
-                    button_type = "primary" if define_updated_after_seeds else "secondary"
-                    button_label = "🔄 Regenerate ⚠️" if define_updated_after_seeds else "🔄 Regenerate"
+                st.markdown(f"<small style='color: gray;'>Last updated: {format_local_time(latest_seed.created_at)}</small>", unsafe_allow_html=True)
+                if define_updated_after_seeds:
+                    st.markdown(f"<small style='color: orange;'>⚠️ Define updated: {format_local_time(define_summary.created_at)}</small>", unsafe_allow_html=True)
 
-                    if st.button(button_label, key="regenerate_seeds", type=button_type, use_container_width=True):
+                # Display existing seed ideas
+                st.markdown("")
+                display_seed_ideas(existing_seeds)
+
+                # Display regenerate button if define update
+                st.markdown("")
+                if define_updated_after_seeds:
+                    if st.button("🔄 Regenerate Seed Ideas", type="primary", use_container_width=True):
                         # Delete existing seeds before regenerating
                         db.query(BrainstormIdea).filter(
                             BrainstormIdea.project_id == project.id,
@@ -93,10 +94,6 @@ def open_brainstorming_dialog(project):
                         generate_seed_ideas(project.id)
                         db.close()
                         st.rerun()
-
-                st.markdown("")
-                # Display existing seed ideas
-                display_seed_ideas(existing_seeds)
             else:
                 # No seeds yet - show generate button
                 if st.button("✨ Generate Seed Ideas", type="primary", use_container_width=True):
@@ -345,8 +342,112 @@ def categorize_ideas(project_id):
 
             db.commit()
 
+            # Generate ideate stage summary after categorization
+            generate_ideate_summary(project_id)
+
     except Exception:
         # Silent fail - categorization is optional
+        pass
+    finally:
+        db.close()
+
+def generate_ideate_summary(project_id):
+    """
+    Automatically generate Ideate stage summary from brainstorming, mind mapping, and SCAMPER results.
+    Called silently after categorization is updated.
+    Keeps only 1 summary per project for ideate stage (overwrites previous version).
+    """
+    db = get_db()
+    try:
+        # Get project
+        project = db.query(Project).filter(Project.id == project_id).first()
+        if not project:
+            return
+
+        # Collect all ideation data
+        ideation_data = ""
+
+        # 1. Get brainstorming categorization
+        categorization = db.query(IdeaCategorization).filter(
+            IdeaCategorization.project_id == project_id
+        ).order_by(IdeaCategorization.updated_at.desc()).first()
+
+        if categorization:
+            ideation_data += f"**Brainstorming Categories:**\n{categorization.categorization_text}\n\n"
+
+        # 2. Get seed ideas
+        seed_ideas = db.query(BrainstormIdea).filter(
+            BrainstormIdea.project_id == project_id,
+            BrainstormIdea.idea_type.like('seed_%')
+        ).order_by(BrainstormIdea.order_index).all()
+
+        if seed_ideas:
+            ideation_data += "**Seed Ideas:**\n"
+            for idea in seed_ideas[:10]:  # Limit to first 10
+                ideation_data += f"- {idea.idea_text}\n"
+            ideation_data += "\n"
+
+        # 3. Get expansions (user-generated ideas)
+        expansions = db.query(BrainstormIdea).filter(
+            BrainstormIdea.project_id == project_id,
+            BrainstormIdea.idea_type == 'expansion'
+        ).order_by(BrainstormIdea.created_at.desc()).limit(5).all()
+
+        if expansions:
+            ideation_data += "**Expanded Ideas:**\n"
+            for expansion in expansions:
+                # Get first 100 chars
+                preview = expansion.idea_text[:100] + "..." if len(expansion.idea_text) > 100 else expansion.idea_text
+                ideation_data += f"- {preview}\n"
+            ideation_data += "\n"
+
+        # TODO: Add mind mapping results when implemented
+        # TODO: Add SCAMPER results when implemented
+
+        # Only generate summary if we have ideation data
+        if not ideation_data.strip():
+            return
+
+        # Generate summary using AI
+        from prompts.summary import IDEATE_STAGE_SUMMARY_PROMPT
+        ai_service = AIService()
+
+        system_prompt = IDEATE_STAGE_SUMMARY_PROMPT.format(
+            project_name=project.name,
+            project_area=project.area,
+            project_goal=project.goal,
+            ideation_data=ideation_data
+        )
+
+        user_prompt = "Synthesize the ideation results into a concise summary."
+
+        summary_text = ai_service._call_openai(system_prompt, user_prompt)
+
+        if summary_text:
+            # Check if summary already exists for this project's ideate stage
+            existing_summary = db.query(StageSummary).filter(
+                StageSummary.project_id == project_id,
+                StageSummary.stage == "ideate"
+            ).first()
+
+            if existing_summary:
+                # Update existing summary (keep only 1 version)
+                existing_summary.summary_text = summary_text
+                existing_summary.created_at = datetime.now(timezone.utc)
+            else:
+                # Create new summary
+                new_summary = StageSummary(
+                    project_id=project_id,
+                    stage="ideate",
+                    summary_text=summary_text,
+                    version=1
+                )
+                db.add(new_summary)
+
+            db.commit()
+
+    except Exception:
+        # Silently fail - don't interrupt user experience
         pass
     finally:
         db.close()
