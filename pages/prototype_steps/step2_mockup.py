@@ -5,7 +5,6 @@ from database.models import MockupIteration, SketchIteration
 from services.ai_service import AIService
 from utils.time_utils import format_local_time
 from prompts.prototype.mockup_generation import GENERATE_MOCKUP_PROMPT, REFINE_MOCKUP_PROMPT
-import requests
 from pathlib import Path
 from datetime import datetime, timezone
 
@@ -76,7 +75,7 @@ def render_mockup_generation(prototype_page, project, ideate_summary, db):
         if mockups:
             for mockup in mockups:
                 with st.expander(f"v{mockup.iteration_number} - {format_local_time(mockup.created_at)}", expanded=(mockup == mockups[-1])):
-                    st.image(mockup.image_url, use_container_width=True)
+                    st.image(mockup.image_path, use_container_width=True)
                     if mockup.user_refinement:
                         st.caption(f"📝 {mockup.user_refinement}")
 
@@ -126,7 +125,7 @@ def render_finalized_mockup(prototype_page, db):
 
         with col1:
             st.markdown("### Final Mockup")
-            st.image(final_mockup.image_url, use_container_width=True)
+            st.image(final_mockup.image_path, use_container_width=True)
             st.caption(f"Finalized on: {format_local_time(final_mockup.created_at)}")
 
         with col2:
@@ -141,7 +140,7 @@ def render_finalized_mockup(prototype_page, db):
             st.rerun()
 
 def generate_mockup(prototype_page, project, ideate_summary, final_sketch, style, color_scheme, additional_instructions, db):
-    """Generate initial mockup using DALL-E"""
+    """Generate initial mockup using DALL-E/GPT-4o"""
 
     with st.spinner("🎨 Generating mockup with AI... This may take a moment."):
         ai_service = AIService()
@@ -167,14 +166,28 @@ def generate_mockup(prototype_page, project, ideate_summary, final_sketch, style
             user_refinement=additional_instructions or "No additional requirements"
         )
 
-        # Generate image
-        image_url = ai_service.generate_image_with_dalle(
+        # Generate image using GPT-4o (returns local temp file path)
+        temp_image_path = ai_service.generate_image_with_gpt4o(
             prompt=prompt,
-            size="1024x1024",
-            quality="standard"
+            reference_image_path=None  # No reference for initial generation
         )
 
-        if image_url:
+        if temp_image_path:
+            # Move from temp location to permanent location
+            try:
+                timestamp = datetime.now(timezone.utc).strftime("%Y%m%d_%H%M%S")
+                local_filename = f"mockup_{prototype_page.id}_{timestamp}.png"
+                local_path = MOCKUP_DIR / local_filename
+
+                # Copy from temp to permanent location
+                import shutil
+                shutil.move(temp_image_path, local_path)
+
+                saved_image_path = str(local_path)
+            except Exception as e:
+                st.error(f"Error saving image: {str(e)}")
+                return
+
             # Save mockup iteration
             iteration_number = db.query(MockupIteration).filter(
                 MockupIteration.prototype_page_id == prototype_page.id
@@ -183,7 +196,7 @@ def generate_mockup(prototype_page, project, ideate_summary, final_sketch, style
             mockup = MockupIteration(
                 prototype_page_id=prototype_page.id,
                 iteration_number=iteration_number,
-                image_url=image_url,
+                image_path=saved_image_path,  # Save local path
                 generation_prompt=prompt,
                 style_params={
                     "style": style,
@@ -208,22 +221,43 @@ def refine_mockup(prototype_page, project, ideate_summary, final_sketch, previou
         # Get previous style params
         prev_style = previous_mockup.style_params or {}
 
+        # Get previous mockup image path (stored locally)
+        previous_image_path = None
+        if previous_mockup.image_path:
+            previous_image_path = Path(previous_mockup.image_path)
+            if not previous_image_path.exists():
+                st.warning(f"Previous mockup file not found: {previous_mockup.image_path}")
+
         prompt = REFINE_MOCKUP_PROMPT.format(
-            previous_mockup_description=f"Previous mockup (v{previous_mockup.iteration_number})",
+            previous_mockup_description=f"Previous mockup (v{previous_mockup.iteration_number}) - see image above",
             user_refinement=refinement_text,
             color_scheme=prev_style.get('color_scheme', 'modern'),
             style=prev_style.get('style', 'modern'),
             specific_improvements=refinement_text
         )
 
-        # Generate refined image
-        image_url = ai_service.generate_image_with_dalle(
+        # Generate refined image with GPT-4o, passing the previous mockup (returns temp file path)
+        temp_image_path = ai_service.generate_image_with_gpt4o(
             prompt=prompt,
-            size="1024x1024",
-            quality="standard"
+            reference_image_path=str(previous_image_path) if previous_image_path else None
         )
 
-        if image_url:
+        if temp_image_path:
+            # Move from temp location to permanent location
+            try:
+                timestamp = datetime.now(timezone.utc).strftime("%Y%m%d_%H%M%S")
+                local_filename = f"mockup_{prototype_page.id}_{timestamp}.png"
+                local_path = MOCKUP_DIR / local_filename
+
+                # Copy from temp to permanent location
+                import shutil
+                shutil.move(temp_image_path, local_path)
+
+                saved_image_path = str(local_path)
+            except Exception as e:
+                st.error(f"Error saving refined image: {str(e)}")
+                return
+
             iteration_number = db.query(MockupIteration).filter(
                 MockupIteration.prototype_page_id == prototype_page.id
             ).count() + 1
@@ -231,7 +265,7 @@ def refine_mockup(prototype_page, project, ideate_summary, final_sketch, previou
             mockup = MockupIteration(
                 prototype_page_id=prototype_page.id,
                 iteration_number=iteration_number,
-                image_url=image_url,
+                image_path=saved_image_path,  # Save local path
                 generation_prompt=prompt,
                 style_params=prev_style,
                 user_refinement=refinement_text
