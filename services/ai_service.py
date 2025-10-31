@@ -6,6 +6,7 @@ Wrapper for all AI-powered generation tasks
 from openai import OpenAI
 from config.settings import Settings
 from typing import Dict, Any, Optional
+from datetime import datetime
 import json
 import base64
 
@@ -122,5 +123,108 @@ class AIService:
         except Exception as e:
             print(f"Error generating image: {str(e)}")
             return None
+
+    def generate_image_with_gpt4o(self, prompt: str, reference_image_path: Optional[str] = None) -> Optional[str]:
+        """
+        Generate an image using GPT-4o image generation (gpt-image-1) with DALL-E 3 fallback
+        For refinements, analyzes the reference image first to enhance prompt
+
+        Args:
+            prompt: Description of the image to generate or refinement instructions
+            reference_image_path: Optional path to reference image for refinement
+
+        Returns:
+            Local file path of the generated image, or None if error
+        """
+        from pathlib import Path
+        import requests
+
+        # If there's a reference image, use GPT-4o vision to analyze it first
+        enhanced_prompt = prompt
+        if reference_image_path:
+            try:
+                # Use vision to understand the previous mockup
+                analysis_prompt = f"""Analyze this mockup image in detail. Describe the layout, visual style, colors, typography, and key UI elements.
+
+Based on your analysis, suggest how to generate a refined version with these changes:
+{prompt}
+
+Maintain all other aspects of the design including layout structure, visual style, and elements not mentioned in the changes."""
+
+                analysis = self.analyze_image_with_vision(
+                    image_path=reference_image_path,
+                    prompt=analysis_prompt
+                )
+
+                # Use the analysis to create a more detailed generation prompt
+                enhanced_prompt = f"{prompt}\n\nPrevious design context: {analysis[:1500]}"
+            except Exception as e:
+                print(f"Warning: Could not analyze reference image: {str(e)}")
+                # Continue with original prompt if analysis fails
+
+        # Try gpt-image-1 first
+        try:
+            print("Attempting to generate image with gpt-image-1...")
+            response = self.client.images.generate(
+                model="gpt-image-1",
+                prompt=enhanced_prompt,
+                n=1,
+                size="1024x1024"
+            )
+
+            # Decode base64 image and save to temporary file
+            image_b64 = response.data[0].b64_json
+            image_bytes = base64.b64decode(image_b64)
+
+            # Create a temporary file to return
+            temp_dir = Path("uploads/mockups/temp")
+            temp_dir.mkdir(parents=True, exist_ok=True)
+
+            temp_file = temp_dir / f"temp_{datetime.now().strftime('%Y%m%d_%H%M%S')}.png"
+            with open(temp_file, 'wb') as f:
+                f.write(image_bytes)
+
+            print(f"✅ Successfully generated image with gpt-image-1")
+            return str(temp_file)
+
+        except Exception as gpt_error:
+            print(f"⚠️ gpt-image-1 failed: {str(gpt_error)}")
+            print("Falling back to DALL-E 3...")
+
+            # Fallback to DALL-E 3
+            try:
+                response = self.client.images.generate(
+                    model="dall-e-3",
+                    prompt=enhanced_prompt[:4000],  # DALL-E 3 has a 4000 char limit
+                    size="1024x1024",
+                    quality="standard",
+                    n=1
+                )
+
+                # DALL-E 3 returns a URL, so we need to download it
+                image_url = response.data[0].url
+
+                # Download the image
+                image_response = requests.get(image_url, timeout=30)
+                if image_response.status_code == 200:
+                    # Save to temporary file
+                    temp_dir = Path("uploads/mockups/temp")
+                    temp_dir.mkdir(parents=True, exist_ok=True)
+
+                    temp_file = temp_dir / f"temp_{datetime.now().strftime('%Y%m%d_%H%M%S')}.png"
+                    with open(temp_file, 'wb') as f:
+                        f.write(image_response.content)
+
+                    print(f"✅ Successfully generated image with DALL-E 3 (fallback)")
+                    return str(temp_file)
+                else:
+                    print(f"Error downloading DALL-E 3 image: HTTP {image_response.status_code}")
+                    return None
+
+            except Exception as dalle_error:
+                print(f"❌ DALL-E 3 also failed: {str(dalle_error)}")
+                import traceback
+                traceback.print_exc()
+                return None
 
 
