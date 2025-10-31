@@ -70,7 +70,7 @@ def render_code_step(prototype_page, project, db):
 
         # Show final mockup reference
         with st.expander("🎨 Original Mockup"):
-            st.image(final_mockup.image_url, use_container_width=True)
+            st.image(final_mockup.image_path, use_container_width=True)
 
         # Display live preview
         if prototype_page.html_code:
