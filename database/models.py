@@ -215,3 +215,59 @@ class MockupIteration(Base):
 
     def __repr__(self):
         return f"<MockupIteration(id={self.id}, iteration={self.iteration_number}, page_id={self.prototype_page_id})>"
+
+class UserTest(Base):
+    """Records of user testing sessions"""
+    __tablename__ = "user_tests"
+
+    id = Column(Integer, primary_key=True, index=True)
+    project_id = Column(Integer, ForeignKey("projects.id"), nullable=False)
+    prototype_page_id = Column(Integer, ForeignKey("prototype_pages.id"), nullable=True)
+    test_type = Column(String(50), nullable=False)  # feedback, usability, a_b, etc.
+    test_name = Column(String(255), nullable=False)
+    participant_count = Column(Integer, default=0)
+    created_at = Column(DateTime, default=datetime.utcnow)
+    updated_at = Column(DateTime, default=datetime.utcnow, onupdate=datetime.utcnow)
+
+    # Relationships
+    project = relationship("Project")
+    prototype_page = relationship("PrototypePage")
+    feedback_items = relationship("TestFeedback", back_populates="user_test", cascade="all, delete-orphan")
+    insights = relationship("TestInsight", back_populates="user_test", cascade="all, delete-orphan")
+
+    def __repr__(self):
+        return f"<UserTest(id={self.id}, name='{self.test_name}', type='{self.test_type}')>"
+
+class TestFeedback(Base):
+    """Raw feedback collected from testers"""
+    __tablename__ = "test_feedback"
+
+    id = Column(Integer, primary_key=True, index=True)
+    user_test_id = Column(Integer, ForeignKey("user_tests.id"), nullable=False)
+    participant_name = Column(String(255), nullable=True)
+    feedback_text = Column(Text, nullable=False)
+    rating = Column(Integer, nullable=True)  # Optional 1-5 rating
+    created_at = Column(DateTime, default=datetime.utcnow)
+
+    # Relationships
+    user_test = relationship("UserTest", back_populates="feedback_items")
+
+    def __repr__(self):
+        return f"<TestFeedback(id={self.id}, user_test_id={self.user_test_id})>"
+
+class TestInsight(Base):
+    """AI-analyzed insights from test feedback"""
+    __tablename__ = "test_insights"
+
+    id = Column(Integer, primary_key=True, index=True)
+    user_test_id = Column(Integer, ForeignKey("user_tests.id"), nullable=False)
+    insight_type = Column(String(50), nullable=False)  # sentiment, theme, issue, recommendation
+    insight_text = Column(Text, nullable=False)
+    priority = Column(String(20), nullable=True)  # critical, high, medium, low
+    created_at = Column(DateTime, default=datetime.utcnow)
+
+    # Relationships
+    user_test = relationship("UserTest", back_populates="insights")
+
+    def __repr__(self):
+        return f"<TestInsight(id={self.id}, type='{self.insight_type}', priority='{self.priority}')>"
