@@ -204,7 +204,7 @@ class MockupIteration(Base):
     id = Column(Integer, primary_key=True, index=True)
     prototype_page_id = Column(Integer, ForeignKey("prototype_pages.id"), nullable=False)
     iteration_number = Column(Integer, nullable=False)
-    image_url = Column(Text, nullable=False)  # URL or path to generated image
+    image_path = Column(Text, nullable=False)  # Local path to generated image
     generation_prompt = Column(Text, nullable=False)
     style_params = Column(JSON, nullable=True)  # {style: "minimalist", color: "blue", etc.}
     user_refinement = Column(Text, nullable=True)  # User's refinement instructions
