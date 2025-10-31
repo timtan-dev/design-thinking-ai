@@ -13,6 +13,7 @@ from pages.empathise import render_empathise_page
 from pages.define import render_define_page
 from pages.ideate import render_ideate_page
 from pages.prototype import render_prototype_page
+from pages.test import render_test_page
 
 import os
 
@@ -225,7 +226,7 @@ def main():
         elif current_stage == 4:
             render_prototype_page(current_project)
         elif current_stage == 5:
-            render_placeholder_stage("Test")
+            render_test_page(current_project)
         elif current_stage == 6:
             render_placeholder_stage("Implement")
 
