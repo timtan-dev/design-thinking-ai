@@ -326,8 +326,10 @@ class JiraConfig(Base):
 
     id = Column(Integer, primary_key=True, index=True)
     project_id = Column(Integer, ForeignKey("projects.id"), nullable=False, unique=True)
+    user_id = Column(String(255), nullable=False, index=True)  # User who connected Jira
     jira_project_key = Column(String(50), nullable=False)
     jira_url = Column(String(500), nullable=False)
+    jira_cloud_id = Column(String(255), nullable=True)  # Atlassian cloud ID
     epic_key = Column(String(50), nullable=True)  # Created Epic key
     last_sync_at = Column(DateTime, nullable=True)
     created_at = Column(DateTime, default=datetime.utcnow)
@@ -338,3 +340,23 @@ class JiraConfig(Base):
 
     def __repr__(self):
         return f"<JiraConfig(project_id={self.project_id}, key='{self.jira_project_key}')>"
+
+class JiraOAuthToken(Base):
+    """Store encrypted OAuth tokens per user for Jira integration"""
+    __tablename__ = "jira_oauth_tokens"
+
+    id = Column(Integer, primary_key=True, index=True)
+    user_id = Column(String(255), nullable=False, index=True, unique=True)
+    access_token = Column(Text, nullable=False)  # Encrypted OAuth access token
+    refresh_token = Column(Text, nullable=False)  # Encrypted OAuth refresh token
+    token_type = Column(String(50), default="Bearer")
+    expires_at = Column(DateTime, nullable=False)  # Token expiration time
+    scope = Column(Text, nullable=True)  # OAuth scopes granted
+    jira_account_id = Column(String(255), nullable=False)  # Atlassian account ID
+    jira_display_name = Column(String(255), nullable=True)  # User's display name in Jira
+    jira_email = Column(String(255), nullable=True)  # User's email in Jira
+    created_at = Column(DateTime, default=datetime.utcnow)
+    updated_at = Column(DateTime, default=datetime.utcnow, onupdate=datetime.utcnow)
+
+    def __repr__(self):
+        return f"<JiraOAuthToken(user_id='{self.user_id}', jira_account_id='{self.jira_account_id}')>"

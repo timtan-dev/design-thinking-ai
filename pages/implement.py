@@ -509,9 +509,12 @@ def show_add_task_dialog(roadmap, db):
                 st.rerun()
 
 def render_jira_export_tab(project, roadmap, db):
-    """Tab 3: Jira Export"""
+    """Tab 3: Jira Export with OAuth 2.0"""
 
-    st.markdown("### Jira Integration")
+    from database.models import JiraOAuthToken
+    from services.jira_oauth_service import JiraOAuthService
+
+    st.markdown("### Jira Integration via OAuth 2.0")
 
     if not roadmap:
         st.warning("⚠️ Please generate a roadmap first in Tab 1.")
@@ -525,6 +528,70 @@ def render_jira_export_tab(project, roadmap, db):
         st.warning("⚠️ Please generate tasks first in Tab 2.")
         return
 
+    # For MVP: use a default user_id (in production, get from authentication)
+    user_id = project.user_id or "default_user"
+
+    # Check OAuth authorization
+    oauth_service = JiraOAuthService()
+    is_authorized = oauth_service.is_user_authorized(user_id)
+
+    oauth_token = db.query(JiraOAuthToken).filter(
+        JiraOAuthToken.user_id == user_id
+    ).first()
+
+    # OAuth Connection Status
+    with st.expander("🔐 Jira OAuth Connection", expanded=not is_authorized):
+        if is_authorized and oauth_token:
+            st.success(f"✅ Connected to Jira as {oauth_token.jira_display_name or oauth_token.jira_email}")
+            st.markdown(f"**Jira Account:** {oauth_token.jira_email}")
+            st.markdown(f"**Connected:** {format_local_time(oauth_token.created_at)}")
+
+            col1, col2 = st.columns(2)
+
+            with col1:
+                if st.button("🔄 Refresh Connection"):
+                    try:
+                        # Test connection
+                        token = oauth_service.get_valid_access_token(user_id)
+                        if token:
+                            st.success("✅ Connection refreshed successfully!")
+                        else:
+                            st.error("❌ Failed to refresh. Please reconnect.")
+                    except Exception as e:
+                        st.error(f"❌ Error: {str(e)}")
+
+            with col2:
+                if st.button("🔌 Disconnect Jira", type="secondary"):
+                    oauth_service.revoke_token(user_id)
+                    st.success("✅ Disconnected from Jira")
+                    st.rerun()
+
+        else:
+            st.warning("⚠️ Not connected to Jira. Please authorize to enable Jira integration.")
+            st.markdown("""
+            **How to connect:**
+            1. Click 'Connect to Jira' below
+            2. You'll be redirected to Atlassian to authorize
+            3. Grant permissions and return to this page
+            4. Your credentials are securely encrypted and stored
+            """)
+
+            if st.button("🔗 Connect to Jira", type="primary"):
+                st.info("🚧 OAuth callback URL setup required. See SETUP_JIRA.md for instructions.")
+                # In production, this would redirect to OAuth URL
+                # For now, show instructions
+                import secrets
+                state = secrets.token_urlsafe(32)
+                auth_url = oauth_service.get_authorization_url(state)
+                st.markdown(f"**Authorization URL:**")
+                st.code(auth_url, language="text")
+                st.info("💡 In production, clicking this button would redirect you to Atlassian. Currently showing URL for manual setup.")
+
+    if not is_authorized:
+        st.markdown("---")
+        st.info("👆 Please connect to Jira above to enable task export and sync.")
+        return
+
     # Check for Jira config
     jira_config = db.query(JiraConfig).filter(
         JiraConfig.project_id == project.id
@@ -536,40 +603,65 @@ def render_jira_export_tab(project, roadmap, db):
         if time_since_sync > 5:
             st.warning(f"⚠️ Last sync was {int(time_since_sync)} minutes ago. Consider syncing to get latest status.")
 
-    # Jira configuration section
-    with st.expander("⚙️ Jira Configuration", expanded=not jira_config):
-        st.markdown("Configure your Jira project connection:")
+    st.markdown("---")
+
+    # Jira Project Configuration
+    with st.expander("⚙️ Jira Project Configuration", expanded=not jira_config):
+        st.markdown("Configure which Jira project to sync with:")
 
         with st.form("jira_config_form"):
-            jira_url = st.text_input(
-                "Jira URL",
-                value=jira_config.jira_url if jira_config else "",
-                placeholder="https://your-company.atlassian.net"
-            )
+            # Get accessible resources
+            try:
+                access_token = oauth_service.get_valid_access_token(user_id)
+                resources = oauth_service.get_accessible_resources(access_token)
+
+                if resources:
+                    resource_options = [f"{r['name']} ({r['url']})" for r in resources]
+                    selected_resource = st.selectbox(
+                        "Select Jira Site",
+                        options=range(len(resource_options)),
+                        format_func=lambda i: resource_options[i]
+                    )
+
+                    jira_url = resources[selected_resource]['url']
+                    cloud_id = resources[selected_resource]['id']
+
+                    st.markdown(f"**Cloud ID:** `{cloud_id}`")
+                else:
+                    st.error("No accessible Jira sites found")
+                    jira_url = st.text_input("Jira URL", placeholder="https://your-company.atlassian.net")
+                    cloud_id = None
+
+            except Exception as e:
+                st.error(f"Failed to load Jira sites: {str(e)}")
+                jira_url = st.text_input("Jira URL", placeholder="https://your-company.atlassian.net")
+                cloud_id = None
 
             jira_project_key = st.text_input(
                 "Jira Project Key",
                 value=jira_config.jira_project_key if jira_config else "",
-                placeholder="PROJ"
+                placeholder="PROJ",
+                help="The project key where tasks will be created"
             )
-
-            st.info("💡 Jira API credentials are stored in your .env file (JIRA_EMAIL, JIRA_API_TOKEN)")
 
             submitted = st.form_submit_button("💾 Save Configuration", type="primary")
 
             if submitted:
-                if not jira_url or not jira_project_key:
+                if not jira_project_key or not jira_url:
                     st.error("Please fill in all fields")
                 else:
                     if jira_config:
                         jira_config.jira_url = jira_url
                         jira_config.jira_project_key = jira_project_key
+                        jira_config.jira_cloud_id = cloud_id
                         jira_config.updated_at = datetime.utcnow()
                     else:
                         jira_config = JiraConfig(
                             project_id=project.id,
+                            user_id=user_id,
                             jira_url=jira_url,
-                            jira_project_key=jira_project_key
+                            jira_project_key=jira_project_key,
+                            jira_cloud_id=cloud_id
                         )
                         db.add(jira_config)
 
@@ -604,67 +696,174 @@ def render_jira_export_tab(project, roadmap, db):
     if not jira_config.epic_key:
         st.info(f"📦 An Epic will be created with name: **{project.name}**")
     else:
-        st.success(f"✅ Epic created: {jira_config.epic_key}")
+        st.success(f"✅ Epic created: [{jira_config.epic_key}]({jira_config.jira_url}/browse/{jira_config.epic_key})")
 
     # Preview tasks
-    with st.expander(f"👀 Preview Tasks to Export ({len(pending_tasks)} pending)"):
-        for task in pending_tasks[:10]:  # Show first 10
-            st.markdown(f"**[{task.moscow_category.upper()}]** {task.task_title}")
-            st.markdown(f"- Priority: {task.priority}, Story Points: {task.story_points}")
-            st.markdown("---")
+    if pending_tasks:
+        with st.expander(f"👀 Preview Tasks to Export ({len(pending_tasks)} pending)"):
+            for task in pending_tasks[:10]:  # Show first 10
+                st.markdown(f"**[{task.moscow_category.upper()}]** {task.task_title}")
+                st.markdown(f"- Priority: {task.priority}, Story Points: {task.story_points}")
+                st.markdown("---")
 
-        if len(pending_tasks) > 10:
-            st.markdown(f"... and {len(pending_tasks) - 10} more tasks")
+            if len(pending_tasks) > 10:
+                st.markdown(f"... and {len(pending_tasks) - 10} more tasks")
 
-    # Push to Jira button
+    # Action buttons
     col1, col2 = st.columns(2)
 
     with col1:
         if st.button("🚀 Push Tasks to Jira", type="primary", disabled=len(pending_tasks) == 0):
-            push_tasks_to_jira(project, roadmap, pending_tasks, jira_config, db)
+            push_tasks_to_jira(project, roadmap, pending_tasks, jira_config, user_id, db)
             st.rerun()
 
     with col2:
         if st.button("🔄 Sync Status from Jira", disabled=len(synced_tasks) == 0):
-            sync_status_from_jira(project, synced_tasks, jira_config, db)
+            sync_status_from_jira(project, synced_tasks, jira_config, user_id, db)
             st.rerun()
 
     st.markdown("---")
-    st.info("💡 **Note:** Jira integration requires MCP server setup. See .env.example for configuration.")
+    st.info("💡 **Note:** Jira integration uses OAuth 2.0 for secure authentication. Your credentials are encrypted.")
 
-def push_tasks_to_jira(project, roadmap, tasks, jira_config, db):
-    """Push tasks to Jira via MCP"""
+def push_tasks_to_jira(project, roadmap, tasks, jira_config, user_id, db):
+    """Push tasks to Jira using OAuth 2.0 and direct API calls"""
 
-    # This would use MCP to interact with Jira
-    # For now, this is a placeholder
-    st.warning("⚠️ MCP Jira integration not yet configured. Please set up MCP server.")
-    st.info("📝 This feature requires MCP server setup. See SETUP_MCP.md for instructions.")
+    from services.jira_api_service import JiraAPIService
 
-    # TODO: Implement MCP Jira integration
-    # Example flow:
-    # 1. Create Epic if not exists
-    # 2. For each task:
-    #    - Create Jira issue
-    #    - Set story points, priority, etc.
-    #    - Link to Epic
-    #    - Store issue_key in database
-    # 3. Update last_sync_at
+    try:
+        # Initialize Jira API service
+        jira_service = JiraAPIService(
+            user_id=user_id,
+            jira_url=jira_config.jira_url,
+            cloud_id=jira_config.jira_cloud_id
+        )
 
-def sync_status_from_jira(project, tasks, jira_config, db):
-    """Sync task status from Jira via MCP"""
+        with st.spinner("🚀 Pushing tasks to Jira..."):
+            # Step 1: Create Epic if not exists
+            if not jira_config.epic_key:
+                st.info("Creating Epic...")
+                epic_response = jira_service.create_epic(
+                    project_key=jira_config.jira_project_key,
+                    epic_name=project.name,
+                    description=f"Implementation roadmap for {project.name}\n\nGoal: {project.goal}"
+                )
 
-    # This would use MCP to fetch status updates
-    # For now, this is a placeholder
-    st.warning("⚠️ MCP Jira integration not yet configured.")
-    st.info("📝 This feature requires MCP server setup. See SETUP_MCP.md for instructions.")
+                jira_config.epic_key = epic_response["key"]
+                db.commit()
+                st.success(f"✅ Epic created: {epic_response['key']}")
 
-    # TODO: Implement MCP Jira integration
-    # Example flow:
-    # 1. For each task with jira_issue_key:
-    #    - Fetch issue status from Jira
-    #    - Update jira_status in database
-    # 2. Update last_sync_at
-    # 3. Check if any status changed, trigger summary generation
+            # Step 2: Create tasks
+            success_count = 0
+            failed_tasks = []
+
+            progress_bar = st.progress(0)
+            status_text = st.empty()
+
+            for idx, task in enumerate(tasks):
+                try:
+                    status_text.text(f"Creating task {idx + 1}/{len(tasks)}: {task.task_title[:50]}...")
+
+                    issue_response = jira_service.create_task(
+                        project_key=jira_config.jira_project_key,
+                        task=task,
+                        epic_key=jira_config.epic_key
+                    )
+
+                    # Update task with Jira issue key
+                    task.jira_issue_key = issue_response["key"]
+                    task.jira_status = "to_do"
+                    success_count += 1
+
+                except Exception as task_error:
+                    print(f"Failed to create task {task.task_title}: {task_error}")
+                    failed_tasks.append((task.task_title, str(task_error)))
+
+                progress_bar.progress((idx + 1) / len(tasks))
+
+            # Update last sync time
+            jira_config.last_sync_at = datetime.utcnow()
+            db.commit()
+
+            progress_bar.empty()
+            status_text.empty()
+
+            # Show results
+            if success_count == len(tasks):
+                st.success(f"✅ Successfully created {success_count} tasks in Jira!")
+            elif success_count > 0:
+                st.warning(f"⚠️ Created {success_count}/{len(tasks)} tasks. {len(failed_tasks)} failed.")
+                if failed_tasks:
+                    with st.expander("View Failed Tasks"):
+                        for task_title, error in failed_tasks:
+                            st.error(f"**{task_title}**: {error}")
+            else:
+                st.error("❌ Failed to create any tasks. Check your Jira configuration.")
+
+    except Exception as e:
+        st.error(f"❌ Error pushing tasks to Jira: {str(e)}")
+        st.info("Please check your Jira connection and project configuration.")
+
+def sync_status_from_jira(project, tasks, jira_config, user_id, db):
+    """Sync task status from Jira using OAuth 2.0 and direct API calls"""
+
+    from services.jira_api_service import JiraAPIService
+
+    try:
+        # Initialize Jira API service
+        jira_service = JiraAPIService(
+            user_id=user_id,
+            jira_url=jira_config.jira_url,
+            cloud_id=jira_config.jira_cloud_id
+        )
+
+        with st.spinner("🔄 Syncing status from Jira..."):
+            # Get issue keys
+            issue_keys = [task.jira_issue_key for task in tasks if task.jira_issue_key]
+
+            if not issue_keys:
+                st.warning("No tasks to sync (no Jira issue keys found)")
+                return
+
+            # Bulk fetch statuses
+            status_map = jira_service.bulk_get_issue_statuses(issue_keys)
+
+            # Track changes
+            updated_count = 0
+            status_changes = []
+
+            for task in tasks:
+                if task.jira_issue_key and task.jira_issue_key in status_map:
+                    new_status = status_map[task.jira_issue_key]
+
+                    if task.jira_status != new_status:
+                        old_status = task.jira_status or "unknown"
+                        task.jira_status = new_status
+                        updated_count += 1
+                        status_changes.append((task.task_title, old_status, new_status))
+
+            # Update last sync time
+            jira_config.last_sync_at = datetime.utcnow()
+            db.commit()
+
+            # Show results
+            if updated_count > 0:
+                st.success(f"✅ Synced {len(issue_keys)} tasks. {updated_count} status changes detected.")
+
+                with st.expander("View Status Changes"):
+                    for title, old, new in status_changes:
+                        st.markdown(f"**{title}**: `{old}` → `{new}`")
+
+                # Generate stage summary if significant changes
+                if updated_count >= 3:
+                    st.info("📊 Generating implementation summary...")
+                    # TODO: Call generate_implementation_summary()
+
+            else:
+                st.info(f"✅ Synced {len(issue_keys)} tasks. No status changes.")
+
+    except Exception as e:
+        st.error(f"❌ Error syncing from Jira: {str(e)}")
+        st.info("Please check your Jira connection.")
 
 def gather_project_context(project, db):
     """Gather context from all previous stages"""
