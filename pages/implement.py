@@ -635,40 +635,36 @@ def render_jira_export_tab(project, roadmap, db):
 def push_tasks_to_jira(project, roadmap, tasks, jira_config, db):
     """Push tasks to Jira via MCP"""
 
-    with st.spinner("🚀 Pushing tasks to Jira..."):
-        # This would use MCP to interact with Jira
-        # For now, this is a placeholder
-        st.warning("⚠️ MCP Jira integration not yet configured. Please set up MCP server.")
+    # This would use MCP to interact with Jira
+    # For now, this is a placeholder
+    st.warning("⚠️ MCP Jira integration not yet configured. Please set up MCP server.")
+    st.info("📝 This feature requires MCP server setup. See SETUP_MCP.md for instructions.")
 
-        # TODO: Implement MCP Jira integration
-        # Example flow:
-        # 1. Create Epic if not exists
-        # 2. For each task:
-        #    - Create Jira issue
-        #    - Set story points, priority, etc.
-        #    - Link to Epic
-        #    - Store issue_key in database
-        # 3. Update last_sync_at
-
-        st.info("📝 This feature requires MCP server setup. Coming soon!")
+    # TODO: Implement MCP Jira integration
+    # Example flow:
+    # 1. Create Epic if not exists
+    # 2. For each task:
+    #    - Create Jira issue
+    #    - Set story points, priority, etc.
+    #    - Link to Epic
+    #    - Store issue_key in database
+    # 3. Update last_sync_at
 
 def sync_status_from_jira(project, tasks, jira_config, db):
     """Sync task status from Jira via MCP"""
 
-    with st.spinner("🔄 Syncing status from Jira..."):
-        # This would use MCP to fetch status updates
-        # For now, this is a placeholder
-        st.warning("⚠️ MCP Jira integration not yet configured.")
+    # This would use MCP to fetch status updates
+    # For now, this is a placeholder
+    st.warning("⚠️ MCP Jira integration not yet configured.")
+    st.info("📝 This feature requires MCP server setup. See SETUP_MCP.md for instructions.")
 
-        # TODO: Implement MCP Jira integration
-        # Example flow:
-        # 1. For each task with jira_issue_key:
-        #    - Fetch issue status from Jira
-        #    - Update jira_status in database
-        # 2. Update last_sync_at
-        # 3. Check if any status changed, trigger summary generation
-
-        st.info("📝 This feature requires MCP server setup. Coming soon!")
+    # TODO: Implement MCP Jira integration
+    # Example flow:
+    # 1. For each task with jira_issue_key:
+    #    - Fetch issue status from Jira
+    #    - Update jira_status in database
+    # 2. Update last_sync_at
+    # 3. Check if any status changed, trigger summary generation
 
 def gather_project_context(project, db):
     """Gather context from all previous stages"""
