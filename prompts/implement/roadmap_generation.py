@@ -11,15 +11,10 @@ Project Context:
 - Development Approach: {development_approach}
 
 Previous Stage Insights:
-{empathise_summary}
+{project_context}
 
-{define_summary}
-
-{ideate_summary}
-
-{prototype_summary}
-
-{test_summary}
+Test Feedback Priorities:
+{test_priorities}
 
 Generate a strategic implementation roadmap with 3 phases (MVP → Beta → Launch).
 
