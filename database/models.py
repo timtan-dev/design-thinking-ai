@@ -271,3 +271,70 @@ class TestInsight(Base):
 
     def __repr__(self):
         return f"<TestInsight(id={self.id}, type='{self.insight_type}', priority='{self.priority}')>"
+
+class ImplementationRoadmap(Base):
+    """Implementation roadmap for the project"""
+    __tablename__ = "implementation_roadmaps"
+
+    id = Column(Integer, primary_key=True, index=True)
+    project_id = Column(Integer, ForeignKey("projects.id"), nullable=False)
+    team_size = Column(Integer, default=5)
+    sprint_duration = Column(Integer, default=2)  # weeks
+    target_launch_weeks = Column(Integer, default=12)
+    development_approach = Column(String(50), default="agile")  # agile, waterfall, hybrid
+    phases_json = Column(JSON, nullable=False)  # Detailed roadmap data
+    created_at = Column(DateTime, default=datetime.utcnow)
+    updated_at = Column(DateTime, default=datetime.utcnow, onupdate=datetime.utcnow)
+
+    # Relationships
+    project = relationship("Project")
+    tasks = relationship("ImplementationTask", back_populates="roadmap", cascade="all, delete-orphan")
+
+    def __repr__(self):
+        return f"<ImplementationRoadmap(id={self.id}, project_id={self.project_id})>"
+
+class ImplementationTask(Base):
+    """Individual implementation tasks"""
+    __tablename__ = "implementation_tasks"
+
+    id = Column(Integer, primary_key=True, index=True)
+    roadmap_id = Column(Integer, ForeignKey("implementation_roadmaps.id"), nullable=False)
+    task_title = Column(String(500), nullable=False)
+    task_description = Column(Text, nullable=False)
+    priority = Column(String(20), nullable=False)  # highest, high, medium, low
+    story_points = Column(Integer, nullable=True)  # 1, 2, 3, 5, 8, 13
+    estimated_hours = Column(Integer, nullable=True)
+    skills_required = Column(String(200), nullable=True)  # frontend, backend, design, qa
+    acceptance_criteria = Column(Text, nullable=True)
+    dependencies_json = Column(JSON, nullable=True)  # List of task IDs that block this task
+    moscow_category = Column(String(20), nullable=True)  # must, should, could, wont
+    jira_issue_key = Column(String(50), nullable=True)  # e.g., PROJ-123
+    jira_status = Column(String(50), nullable=True)  # to_do, in_progress, done
+    order_index = Column(Integer, default=0)
+    created_at = Column(DateTime, default=datetime.utcnow)
+    updated_at = Column(DateTime, default=datetime.utcnow, onupdate=datetime.utcnow)
+
+    # Relationships
+    roadmap = relationship("ImplementationRoadmap", back_populates="tasks")
+
+    def __repr__(self):
+        return f"<ImplementationTask(id={self.id}, title='{self.task_title[:30]}...')>"
+
+class JiraConfig(Base):
+    """Jira configuration per project"""
+    __tablename__ = "jira_configs"
+
+    id = Column(Integer, primary_key=True, index=True)
+    project_id = Column(Integer, ForeignKey("projects.id"), nullable=False, unique=True)
+    jira_project_key = Column(String(50), nullable=False)
+    jira_url = Column(String(500), nullable=False)
+    epic_key = Column(String(50), nullable=True)  # Created Epic key
+    last_sync_at = Column(DateTime, nullable=True)
+    created_at = Column(DateTime, default=datetime.utcnow)
+    updated_at = Column(DateTime, default=datetime.utcnow, onupdate=datetime.utcnow)
+
+    # Relationships
+    project = relationship("Project")
+
+    def __repr__(self):
+        return f"<JiraConfig(project_id={self.project_id}, key='{self.jira_project_key}')>"

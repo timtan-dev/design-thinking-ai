@@ -14,6 +14,7 @@ from pages.define import render_define_page
 from pages.ideate import render_ideate_page
 from pages.prototype import render_prototype_page
 from pages.test import render_test_page
+from pages.implement import render_implement_page
 
 import os
 
@@ -228,7 +229,7 @@ def main():
         elif current_stage == 5:
             render_test_page(current_project)
         elif current_stage == 6:
-            render_placeholder_stage("Implement")
+            render_implement_page(current_project)
 
 if __name__ == "__main__":
     main()
