@@ -4,6 +4,7 @@ Handles the OAuth redirect from Atlassian after user authorization
 """
 
 import streamlit as st
+from datetime import datetime
 from services.jira_oauth_service import JiraOAuthService
 from config.database import get_db
 
@@ -56,47 +57,56 @@ if not code or not state:
 
     st.stop()
 
-# Verify state (CSRF protection)
-expected_state = st.session_state.get('oauth_state')
+# Verify state (CSRF protection) - check database, not session
+from database.models import OAuthState
 
-if not expected_state:
-    st.error("❌ No OAuth session found")
-    st.warning("Your session may have expired. Please restart the OAuth flow.")
+db = get_db()
 
-    st.markdown("---")
-    st.info("💡 **Tip:** Make sure you complete the authorization within a few minutes of starting it.")
+oauth_state_record = db.query(OAuthState).filter(
+    OAuthState.state == state
+).first()
 
-    if st.button("← Back to Home"):
-        st.switch_page("app.py")
-
-    st.stop()
-
-if state != expected_state:
-    st.error("❌ Invalid state parameter - possible CSRF attack detected")
-    st.warning("The state parameter doesn't match. This could indicate a security issue.")
+if not oauth_state_record:
+    st.error("❌ Invalid or expired OAuth state")
+    st.warning("The OAuth state was not found or has expired. Please restart the OAuth flow.")
 
     st.markdown("---")
-    st.markdown("### Security Notice:")
+    st.markdown("### Possible Reasons:")
     st.markdown("""
-    The OAuth state parameter validation failed. This is a security measure to prevent CSRF attacks.
-
-    **What happened:**
-    - Expected state: `{}`
-    - Received state: `{}`
+    1. **State expired:** OAuth states expire after 10 minutes
+    2. **Already used:** This state was already used for a previous authorization
+    3. **Invalid state:** The state parameter was tampered with
 
     **What to do:**
-    1. Clear your browser cache
-    2. Return to the Implement page
-    3. Try the authorization again
-    """.format(expected_state[:20] + "...", state[:20] + "..."))
+    - Return to the Implement page
+    - Click "Connect to Jira" again
+    - Complete the authorization within 10 minutes
+    """)
 
     if st.button("← Back to Home"):
         st.switch_page("app.py")
 
     st.stop()
 
-# Get user_id from session (for demo mode, defaults to default_user)
-user_id = st.session_state.get('oauth_user_id', 'default_user')
+# Check if state has expired
+if datetime.utcnow() > oauth_state_record.expires_at:
+    st.error("❌ OAuth state expired")
+    st.warning(f"This authorization request expired at {oauth_state_record.expires_at} UTC.")
+
+    # Clean up expired state
+    db.delete(oauth_state_record)
+    db.commit()
+
+    st.markdown("---")
+    st.info("Please restart the OAuth flow. States expire after 10 minutes for security.")
+
+    if st.button("← Back to Home"):
+        st.switch_page("app.py")
+
+    st.stop()
+
+# Get user_id from the stored state record
+user_id = oauth_state_record.user_id
 
 # Process OAuth callback
 try:
@@ -153,11 +163,9 @@ try:
             st.write("✅ Credentials securely stored!")
             status.update(label="Credentials saved", state="complete")
 
-    # Clear OAuth session data (no longer needed)
-    if 'oauth_state' in st.session_state:
-        del st.session_state['oauth_state']
-    if 'oauth_user_id' in st.session_state:
-        del st.session_state['oauth_user_id']
+    # Clean up: Delete the used OAuth state from database
+    db.delete(oauth_state_record)
+    db.commit()
 
     # Success message
     st.success("✅ Successfully connected to Jira!")
