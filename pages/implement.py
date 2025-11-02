@@ -577,15 +577,32 @@ def render_jira_export_tab(project, roadmap, db):
             """)
 
             if st.button("🔗 Connect to Jira", type="primary"):
-                st.info("🚧 OAuth callback URL setup required. See SETUP_JIRA.md for instructions.")
-                # In production, this would redirect to OAuth URL
-                # For now, show instructions
                 import secrets
+                import os
+
                 state = secrets.token_urlsafe(32)
+                # Store state in session for CSRF verification
+                st.session_state['oauth_state'] = state
+                st.session_state['oauth_user_id'] = user_id
+
                 auth_url = oauth_service.get_authorization_url(state)
-                st.markdown(f"**Authorization URL:**")
-                st.code(auth_url, language="text")
-                st.info("💡 In production, clicking this button would redirect you to Atlassian. Currently showing URL for manual setup.")
+
+                # Check environment - use DEBUG flag or explicit env var
+                is_production = os.getenv("DEBUG", "True").lower() == "false"
+
+                if is_production:
+                    # Production: Use HTML redirect
+                    st.markdown(f'<meta http-equiv="refresh" content="0; url={auth_url}">', unsafe_allow_html=True)
+                    st.info("Redirecting to Atlassian for authorization...")
+                else:
+                    # Development: Show clickable link (Streamlit can't redirect in dev mode)
+                    st.info("🔗 Click the link below to authorize with Jira:")
+                    st.markdown(f"[**Authorize with Atlassian**]({auth_url})", unsafe_allow_html=True)
+
+                    with st.expander("Or copy the full URL"):
+                        st.code(auth_url, language="text")
+
+                    st.warning("⚠️ After authorizing, you'll be redirected to `/oauth/callback`. Create that page to complete the flow.")
 
     if not is_authorized:
         st.markdown("---")
