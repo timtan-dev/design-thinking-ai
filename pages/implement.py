@@ -579,11 +579,19 @@ def render_jira_export_tab(project, roadmap, db):
             if st.button("🔗 Connect to Jira", type="primary"):
                 import secrets
                 import os
+                from datetime import timedelta
+                from database.models import OAuthState
 
                 state = secrets.token_urlsafe(32)
-                # Store state in session for CSRF verification
-                st.session_state['oauth_state'] = state
-                st.session_state['oauth_user_id'] = user_id
+
+                # Store state in DATABASE (not session - session doesn't persist across pages in Streamlit)
+                oauth_state_record = OAuthState(
+                    state=state,
+                    user_id=user_id,
+                    expires_at=datetime.utcnow() + timedelta(minutes=10)
+                )
+                db.add(oauth_state_record)
+                db.commit()
 
                 auth_url = oauth_service.get_authorization_url(state)
 
@@ -689,6 +697,20 @@ def render_jira_export_tab(project, roadmap, db):
     if not jira_config:
         return
 
+    # Check if cloud_id is missing (from old config before OAuth)
+    if not jira_config.jira_cloud_id:
+        st.error("⚠️ Your Jira configuration is missing the Cloud ID (required for OAuth)")
+        st.warning("This happens if you configured Jira before OAuth was enabled. Please re-save your configuration above to fix this.")
+
+        # Show current config for reference
+        with st.expander("📋 Current Configuration (needs update)"):
+            st.markdown(f"- **Project Key:** {jira_config.jira_project_key}")
+            st.markdown(f"- **Jira URL:** {jira_config.jira_url}")
+            st.markdown(f"- **Cloud ID:** `None` ❌ (needs to be set)")
+
+        st.info("👆 Open 'Jira Project Configuration' above and click 'Save Configuration' to update.")
+        return
+
     st.markdown("---")
 
     # Sync status section
@@ -731,19 +753,24 @@ def render_jira_export_tab(project, roadmap, db):
 
     with col1:
         if st.button("🚀 Push Tasks to Jira", type="primary", disabled=len(pending_tasks) == 0):
-            push_tasks_to_jira(project, roadmap, pending_tasks, jira_config, user_id, db)
-            st.rerun()
+            success = push_tasks_to_jira(project, roadmap, pending_tasks, jira_config, user_id, db)
+            if success:
+                st.rerun()  # Only rerun on success to refresh task list
 
     with col2:
         if st.button("🔄 Sync Status from Jira", disabled=len(synced_tasks) == 0):
             sync_status_from_jira(project, synced_tasks, jira_config, user_id, db)
-            st.rerun()
+            # Don't rerun - let user see the sync results
 
     st.markdown("---")
     st.info("💡 **Note:** Jira integration uses OAuth 2.0 for secure authentication. Your credentials are encrypted.")
 
 def push_tasks_to_jira(project, roadmap, tasks, jira_config, user_id, db):
-    """Push tasks to Jira using OAuth 2.0 and direct API calls"""
+    """Push tasks to Jira using OAuth 2.0 and direct API calls
+
+    Returns:
+        bool: True if successful (all or some tasks created), False if completely failed
+    """
 
     from services.jira_api_service import JiraAPIService
 
@@ -807,21 +834,50 @@ def push_tasks_to_jira(project, roadmap, tasks, jira_config, user_id, db):
             # Show results
             if success_count == len(tasks):
                 st.success(f"✅ Successfully created {success_count} tasks in Jira!")
+                return True  # Full success
             elif success_count > 0:
                 st.warning(f"⚠️ Created {success_count}/{len(tasks)} tasks. {len(failed_tasks)} failed.")
                 if failed_tasks:
                     with st.expander("View Failed Tasks"):
                         for task_title, error in failed_tasks:
                             st.error(f"**{task_title}**: {error}")
+                return True  # Partial success - still rerun to show updated tasks
             else:
                 st.error("❌ Failed to create any tasks. Check your Jira configuration.")
+                return False  # Complete failure - don't rerun
 
     except Exception as e:
+        # Use session state to persist error message across reruns
+        st.session_state['jira_push_error'] = str(e)
         st.error(f"❌ Error pushing tasks to Jira: {str(e)}")
         st.info("Please check your Jira connection and project configuration.")
 
+        # Show detailed troubleshooting
+        with st.expander("🔍 Troubleshooting Details"):
+            st.markdown(f"""
+            **Error Type:** `{type(e).__name__}`
+
+            **Error Message:** `{str(e)}`
+
+            **Common Causes:**
+            1. **Missing Cloud ID:** Jira configuration needs to be saved with cloud ID
+            2. **Invalid Project Key:** Check that the Jira project key exists
+            3. **Insufficient Permissions:** Ensure your Jira account has permission to create issues
+            4. **Expired OAuth Token:** Try disconnecting and reconnecting to Jira
+
+            **Next Steps:**
+            1. Check Jira Project Configuration above
+            2. Verify your Cloud ID is set (not None)
+            3. Test connection by clicking "Sync Status from Jira" first
+            """)
+        return False  # Failure - don't rerun
+
 def sync_status_from_jira(project, tasks, jira_config, user_id, db):
-    """Sync task status from Jira using OAuth 2.0 and direct API calls"""
+    """Sync task status from Jira using OAuth 2.0 and direct API calls
+
+    Returns:
+        bool: True if sync successful, False if failed
+    """
 
     from services.jira_api_service import JiraAPIService
 
@@ -839,7 +895,7 @@ def sync_status_from_jira(project, tasks, jira_config, user_id, db):
 
             if not issue_keys:
                 st.warning("No tasks to sync (no Jira issue keys found)")
-                return
+                return False  # No tasks to sync - don't rerun
 
             # Bulk fetch statuses
             status_map = jira_service.bulk_get_issue_statuses(issue_keys)
@@ -875,12 +931,16 @@ def sync_status_from_jira(project, tasks, jira_config, user_id, db):
                     st.info("📊 Generating implementation summary...")
                     # TODO: Call generate_implementation_summary()
 
+                return True  # Success with changes - rerun to refresh UI
+
             else:
                 st.info(f"✅ Synced {len(issue_keys)} tasks. No status changes.")
+                return True  # Success but no changes - still rerun to update sync time
 
     except Exception as e:
         st.error(f"❌ Error syncing from Jira: {str(e)}")
         st.info("Please check your Jira connection.")
+        return False  # Failure - don't rerun
 
 def gather_project_context(project, db):
     """Gather context from all previous stages"""
