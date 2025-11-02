@@ -360,3 +360,16 @@ class JiraOAuthToken(Base):
 
     def __repr__(self):
         return f"<JiraOAuthToken(user_id='{self.user_id}', jira_account_id='{self.jira_account_id}')>"
+
+class OAuthState(Base):
+    """Temporary storage for OAuth state (CSRF protection)"""
+    __tablename__ = "oauth_states"
+
+    id = Column(Integer, primary_key=True, index=True)
+    state = Column(String(255), nullable=False, unique=True, index=True)
+    user_id = Column(String(255), nullable=False)
+    created_at = Column(DateTime, default=datetime.utcnow)
+    expires_at = Column(DateTime, nullable=False)  # States expire after 10 minutes
+
+    def __repr__(self):
+        return f"<OAuthState(state='{self.state[:20]}...', user_id='{self.user_id}')>"
