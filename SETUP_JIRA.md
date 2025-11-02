@@ -40,10 +40,10 @@ Visit [https://developer.atlassian.com/console/myapps/](https://developer.atlass
 
 1. Go to "Authorization" tab
 2. Add Callback URL:
-   - For local development: `http://localhost:8501`
-   - For production: `https://yourdomain.com`
+   - For local development: `http://localhost:8501/oauth_callback`
+   - For production: `https://yourdomain.com/oauth_callback`
 
-   **Note:** Streamlit doesn't support custom URL paths, so we use the base URL and handle the callback via query parameters.
+   **Note:** Streamlit automatically creates routes from files in `pages/` directory. The file `pages/oauth_callback.py` becomes accessible at `/oauth_callback`.
 
 3. Note down:
    - **Client ID** (shown on the Settings page)
@@ -57,7 +57,7 @@ Visit [https://developer.atlassian.com/console/myapps/](https://developer.atlass
 # Jira OAuth 2.0 Configuration
 JIRA_OAUTH_CLIENT_ID=your-client-id-here
 JIRA_OAUTH_CLIENT_SECRET=your-client-secret-here
-JIRA_OAUTH_REDIRECT_URI=http://localhost:8501
+JIRA_OAUTH_REDIRECT_URI=http://localhost:8501/oauth_callback
 
 # Encryption key for storing tokens (generate with: python -c "from cryptography.fernet import Fernet; print(Fernet.generate_key().decode())")
 ENCRYPTION_KEY=your-generated-encryption-key-here
