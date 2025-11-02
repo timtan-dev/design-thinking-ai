@@ -164,12 +164,33 @@ class JiraAPIService:
         if epic_key:
             payload["fields"]["parent"] = {"key": epic_key}
 
-        # Add story points if custom field exists (typically customfield_10016)
-        # Note: Custom field ID varies by Jira instance
-        if task.story_points:
-            payload["fields"]["customfield_10016"] = task.story_points
+        # Story points field removed - field ID varies by Jira instance
+        # Story points are still visible in labels (e.g., "story-points-8")
+        # To re-enable: Find your Jira's story points custom field ID and add:
+        # if task.story_points:
+        #     payload["fields"]["customfield_XXXXX"] = task.story_points
 
         response = requests.post(url, json=payload, headers=self._get_headers())
+
+        # Log detailed error for debugging
+        if response.status_code >= 400:
+            print(f"\n{'='*80}")
+            print(f"JIRA API ERROR - Create Task Failed")
+            print(f"{'='*80}")
+            print(f"Task Title: {task.task_title}")
+            print(f"Status Code: {response.status_code}")
+            print(f"URL: {url}")
+            print(f"\nRequest Payload:")
+            import json
+            print(json.dumps(payload, indent=2))
+            print(f"\nError Response Body:")
+            try:
+                error_detail = response.json()
+                print(json.dumps(error_detail, indent=2))
+            except:
+                print(response.text)
+            print(f"{'='*80}\n")
+
         response.raise_for_status()
 
         return response.json()
@@ -222,8 +243,9 @@ class JiraAPIService:
             return {}
 
         # Use JQL search to get multiple issues at once
+        # Updated to use /search/jql endpoint (v3 API requirement)
         jql = f"key in ({','.join(issue_keys)})"
-        url = f"{self.api_base}/search"
+        url = f"{self.api_base}/search/jql"
 
         params = {
             "jql": jql,
