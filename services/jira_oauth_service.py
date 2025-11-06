@@ -8,14 +8,27 @@ from cryptography.fernet import Fernet
 from database.models import JiraOAuthToken
 from config.database import get_db
 
+# Try to import streamlit for secrets (only available when running in Streamlit)
+try:
+    import streamlit as st
+    HAS_STREAMLIT = True
+except ImportError:
+    HAS_STREAMLIT = False
+
+def _get_secret(key: str, default: str = None) -> str:
+    """Get secret from Streamlit secrets or environment variables"""
+    if HAS_STREAMLIT and hasattr(st, 'secrets') and key in st.secrets:
+        return st.secrets[key]
+    return os.getenv(key, default)
+
 class JiraOAuthService:
     """Handle Jira OAuth 2.0 authentication and token management"""
 
     def __init__(self):
-        self.client_id = os.getenv("JIRA_OAUTH_CLIENT_ID")
-        self.client_secret = os.getenv("JIRA_OAUTH_CLIENT_SECRET")
-        self.redirect_uri = os.getenv("JIRA_OAUTH_REDIRECT_URI", "http://localhost:8501/oauth/callback")
-        self.encryption_key = os.getenv("ENCRYPTION_KEY")
+        self.client_id = _get_secret("JIRA_OAUTH_CLIENT_ID")
+        self.client_secret = _get_secret("JIRA_OAUTH_CLIENT_SECRET")
+        self.redirect_uri = _get_secret("JIRA_OAUTH_REDIRECT_URI", "https://design-thinking-ai-chen2106.streamlit.app/oauth/callback")
+        self.encryption_key = _get_secret("ENCRYPTION_KEY")
 
         if self.encryption_key:
             self.cipher = Fernet(self.encryption_key.encode())
