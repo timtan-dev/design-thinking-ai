@@ -10,11 +10,26 @@ from pathlib import Path
 # Load environment variables
 load_dotenv()
 
+# Try to import streamlit for secrets (only available when running in Streamlit)
+try:
+    import streamlit as st
+    HAS_STREAMLIT = True
+except ImportError:
+    HAS_STREAMLIT = False
+
 class Settings:
     """Application configuration settings"""
 
     # API Keys
-    OPENAI_API_KEY = os.getenv('OPENAI_API_KEY', '')
+    # Priority: Streamlit secrets > Environment variables > Empty string
+    @classmethod
+    def _get_secret(cls, key: str, default: str = '') -> str:
+        """Get secret from Streamlit secrets or environment variables"""
+        if HAS_STREAMLIT and hasattr(st, 'secrets') and key in st.secrets:
+            return st.secrets[key]
+        return os.getenv(key, default)
+
+    OPENAI_API_KEY = _get_secret.__func__(None, 'OPENAI_API_KEY', '')
 
     # Database
     DATABASE_URL = os.getenv('DATABASE_URL', 'sqlite:///./design_thinking.db')

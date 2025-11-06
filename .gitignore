@@ -39,7 +39,8 @@ ENV/
 .env.*.local
 
 # Database
-*.db
+# Note: design_thinking.db is intentionally included for demo data
+# *.db
 *.sqlite
 *.sqlite3
 
