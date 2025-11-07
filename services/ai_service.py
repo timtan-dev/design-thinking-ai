@@ -163,7 +163,7 @@ Maintain all other aspects of the design including layout structure, visual styl
                 print(f"Warning: Could not analyze reference image: {str(e)}")
                 # Continue with original prompt if analysis fails
 
-        # Use DALL-E 3 for image generation
+        # Use DALL-E 3 for image generation with base64 response (avoids network download issues)
         try:
             print("Generating image with DALL-E 3...")
             response = self.client.images.generate(
@@ -171,44 +171,24 @@ Maintain all other aspects of the design including layout structure, visual styl
                 prompt=enhanced_prompt[:4000],  # DALL-E 3 has a 4000 char limit
                 size="1024x1024",
                 quality="standard",
-                n=1
+                n=1,
+                response_format="b64_json"  # Get base64 directly instead of URL
             )
 
-            # DALL-E 3 returns a URL, so we need to download it
-            image_url = response.data[0].url
-            print(f"Image generated, downloading from: {image_url[:80]}...")
+            # Get base64 image data directly (no network download needed)
+            image_b64 = response.data[0].b64_json
+            image_bytes = base64.b64decode(image_b64)
 
-            # Download the image with retries for network issues
-            max_retries = 3
-            for attempt in range(max_retries):
-                try:
-                    image_response = requests.get(image_url, timeout=60)
-                    if image_response.status_code == 200:
-                        # Save to temporary file
-                        temp_dir = Path("uploads/mockups/temp")
-                        temp_dir.mkdir(parents=True, exist_ok=True)
+            # Save to temporary file
+            temp_dir = Path("uploads/mockups/temp")
+            temp_dir.mkdir(parents=True, exist_ok=True)
 
-                        temp_file = temp_dir / f"temp_{datetime.now().strftime('%Y%m%d_%H%M%S')}.png"
-                        with open(temp_file, 'wb') as f:
-                            f.write(image_response.content)
+            temp_file = temp_dir / f"temp_{datetime.now().strftime('%Y%m%d_%H%M%S')}.png"
+            with open(temp_file, 'wb') as f:
+                f.write(image_bytes)
 
-                        print(f"✅ Successfully generated and downloaded image")
-                        return str(temp_file), None
-                    else:
-                        error_msg = f"Failed to download image (HTTP {image_response.status_code})"
-                        print(f"Error: {error_msg}")
-                        if attempt < max_retries - 1:
-                            print(f"Retrying... ({attempt + 2}/{max_retries})")
-                            continue
-                        return None, error_msg
-                except requests.exceptions.RequestException as download_error:
-                    if attempt < max_retries - 1:
-                        print(f"Download attempt {attempt + 1} failed, retrying...")
-                        continue
-                    else:
-                        error_msg = f"Network error downloading image after {max_retries} attempts: {str(download_error)}"
-                        print(f"❌ {error_msg}")
-                        return None, error_msg
+            print(f"✅ Successfully generated image (received as base64)")
+            return str(temp_file), None
 
         except Exception as dalle_error:
             dalle_error_msg = str(dalle_error)
