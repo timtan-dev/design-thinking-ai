@@ -7,10 +7,26 @@ from utils.time_utils import format_local_time
 from prompts.prototype.mockup_generation import GENERATE_MOCKUP_PROMPT, REFINE_MOCKUP_PROMPT
 from pathlib import Path
 from datetime import datetime, timezone
+import base64
+import os
 
 # Create uploads directory for mockups
 MOCKUP_DIR = Path("uploads/mockups")
 MOCKUP_DIR.mkdir(parents=True, exist_ok=True)
+
+def get_image_for_display(item):
+    """
+    Get image for display from Base64 data stored in database
+    Returns: image bytes suitable for st.image()
+    Works for both SketchIteration and MockupIteration
+    """
+    if hasattr(item, 'image_data') and item.image_data:
+        try:
+            return base64.b64decode(item.image_data)
+        except Exception as e:
+            print(f"Error decoding Base64 image: {e}")
+            return None
+    return None
 
 def render_mockup_step(prototype_page, project, ideate_summary, db):
     """Render the AI mockup generation step"""
@@ -44,7 +60,11 @@ def render_mockup_generation(prototype_page, project, ideate_summary, db):
         # Show final sketch
         if final_sketch:
             with st.expander("📱 Based on your sketch"):
-                st.image(final_sketch.image_path, use_container_width=True)
+                image_data = get_image_for_display(final_sketch)
+                if image_data:
+                    st.image(image_data, use_container_width=True)
+                else:
+                    st.error("Sketch image not available")
 
         # Style options
         style = st.selectbox(
@@ -75,7 +95,11 @@ def render_mockup_generation(prototype_page, project, ideate_summary, db):
         if mockups:
             for mockup in mockups:
                 with st.expander(f"v{mockup.iteration_number} - {format_local_time(mockup.created_at)}", expanded=(mockup == mockups[-1])):
-                    st.image(mockup.image_path, use_container_width=True)
+                    image_data = get_image_for_display(mockup)
+                    if image_data:
+                        st.image(image_data, use_container_width=True)
+                    else:
+                        st.error("Mockup image not available")
                     if mockup.user_refinement:
                         st.caption(f"📝 {mockup.user_refinement}")
 
@@ -125,7 +149,11 @@ def render_finalized_mockup(prototype_page, db):
 
         with col1:
             st.markdown("### Final Mockup")
-            st.image(final_mockup.image_path, use_container_width=True)
+            image_data = get_image_for_display(final_mockup)
+            if image_data:
+                st.image(image_data, use_container_width=True)
+            else:
+                st.error("Mockup image not available")
             st.caption(f"Finalized on: {format_local_time(final_mockup.created_at)}")
 
         with col2:
@@ -173,17 +201,16 @@ def generate_mockup(prototype_page, project, ideate_summary, final_sketch, style
         )
 
         if temp_image_path:
-            # Move from temp location to permanent location
+            # Read temp image and convert to Base64
             try:
                 timestamp = datetime.now(timezone.utc).strftime("%Y%m%d_%H%M%S")
                 local_filename = f"mockup_{prototype_page.id}_{timestamp}.png"
-                local_path = MOCKUP_DIR / local_filename
 
-                # Copy from temp to permanent location
-                import shutil
-                shutil.move(temp_image_path, local_path)
+                # Read the temp image and convert to Base64
+                with open(temp_image_path, 'rb') as img_file:
+                    image_bytes = img_file.read()
+                    image_base64 = base64.b64encode(image_bytes).decode('utf-8')
 
-                saved_image_path = str(local_path)
             except Exception as e:
                 st.error(f"Error saving image: {str(e)}")
                 return
@@ -196,7 +223,8 @@ def generate_mockup(prototype_page, project, ideate_summary, final_sketch, style
             mockup = MockupIteration(
                 prototype_page_id=prototype_page.id,
                 iteration_number=iteration_number,
-                image_path=saved_image_path,  # Save local path
+                image_data=image_base64,  # Save Base64 for persistence
+                image_filename=local_filename,
                 generation_prompt=prompt,
                 style_params={
                     "style": style,
@@ -243,17 +271,16 @@ def refine_mockup(prototype_page, project, ideate_summary, final_sketch, previou
         )
 
         if temp_image_path:
-            # Move from temp location to permanent location
+            # Read temp image and convert to Base64
             try:
                 timestamp = datetime.now(timezone.utc).strftime("%Y%m%d_%H%M%S")
                 local_filename = f"mockup_{prototype_page.id}_{timestamp}.png"
-                local_path = MOCKUP_DIR / local_filename
 
-                # Copy from temp to permanent location
-                import shutil
-                shutil.move(temp_image_path, local_path)
+                # Read the temp image and convert to Base64
+                with open(temp_image_path, 'rb') as img_file:
+                    image_bytes = img_file.read()
+                    image_base64 = base64.b64encode(image_bytes).decode('utf-8')
 
-                saved_image_path = str(local_path)
             except Exception as e:
                 st.error(f"Error saving refined image: {str(e)}")
                 return
@@ -265,7 +292,8 @@ def refine_mockup(prototype_page, project, ideate_summary, final_sketch, previou
             mockup = MockupIteration(
                 prototype_page_id=prototype_page.id,
                 iteration_number=iteration_number,
-                image_path=saved_image_path,  # Save local path
+                image_data=image_base64,  # Save Base64 for persistence
+                image_filename=local_filename,
                 generation_prompt=prompt,
                 style_params=prev_style,
                 user_refinement=refinement_text
