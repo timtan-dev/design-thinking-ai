@@ -16,6 +16,7 @@ try:
     HAS_STREAMLIT = True
 except ImportError:
     HAS_STREAMLIT = False
+    st = None
 
 class Settings:
     """Application configuration settings"""
@@ -25,8 +26,17 @@ class Settings:
     @classmethod
     def _get_secret(cls, key: str, default: str = '') -> str:
         """Get secret from Streamlit secrets or environment variables"""
-        if HAS_STREAMLIT and hasattr(st, 'secrets') and key in st.secrets:
-            return st.secrets[key]
+        # Try Streamlit secrets first (for deployment)
+        if HAS_STREAMLIT and st is not None:
+            try:
+                # Check if secrets are available
+                if hasattr(st, 'secrets'):
+                    return st.secrets.get(key, os.getenv(key, default))
+            except Exception:
+                # If secrets not available or any error, fall back to .env
+                pass
+
+        # Fall back to environment variables (for local development)
         return os.getenv(key, default)
 
     OPENAI_API_KEY = _get_secret.__func__(None, 'OPENAI_API_KEY', '')
