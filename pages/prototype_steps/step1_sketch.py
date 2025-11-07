@@ -8,10 +8,25 @@ from prompts.prototype.sketch_analysis import ANALYZE_SKETCH_PROMPT, SUGGEST_IMP
 import os
 from pathlib import Path
 from datetime import datetime, timezone
+import base64
+from io import BytesIO
 
 # Create uploads directory if it doesn't exist
 UPLOAD_DIR = Path("uploads/sketches")
 UPLOAD_DIR.mkdir(parents=True, exist_ok=True)
+
+def get_image_for_display(sketch):
+    """
+    Get image for display from Base64 data stored in database
+    Returns: image bytes suitable for st.image()
+    """
+    if sketch.image_data:
+        try:
+            return base64.b64decode(sketch.image_data)
+        except Exception as e:
+            print(f"Error decoding Base64 image: {e}")
+            return None
+    return None
 
 def render_sketch_step(prototype_page, project, ideate_summary, db):
     """Render the sketch upload and analysis step"""
@@ -59,7 +74,11 @@ def render_sketch_upload(prototype_page, project, ideate_summary, db):
         if sketches:
             for sketch in sketches:
                 with st.expander(f"v{sketch.iteration_number} - {format_local_time(sketch.created_at)}", expanded=(sketch == sketches[-1])):
-                    st.image(sketch.image_path, use_container_width=True)
+                    image_data = get_image_for_display(sketch)
+                    if image_data:
+                        st.image(image_data, use_container_width=True)
+                    else:
+                        st.error("Image not available")
                     if sketch.user_instructions:
                         st.caption(f"📝 {sketch.user_instructions}")
         else:
@@ -113,7 +132,11 @@ def render_finalized_sketch(prototype_page, db):
 
         with col1:
             st.markdown("### Final Sketch")
-            st.image(final_sketch.image_path, use_container_width=True)
+            image_data = get_image_for_display(final_sketch)
+            if image_data:
+                st.image(image_data, use_container_width=True)
+            else:
+                st.error("Image not available")
             st.caption(f"Finalized on: {format_local_time(final_sketch.created_at)}")
 
         with col2:
@@ -135,21 +158,26 @@ def analyze_and_save_sketch(prototype_page, project, ideate_summary, uploaded_fi
         SketchIteration.prototype_page_id == prototype_page.id
     ).count() + 1
 
-    filename = f"page_{prototype_page.id}_v{iteration_number}_{uploaded_file.name}"
-    file_path = UPLOAD_DIR / filename
+    # Get file bytes and convert to Base64 for database storage
+    file_bytes = uploaded_file.getbuffer()
+    image_base64 = base64.b64encode(file_bytes).decode('utf-8')
 
-    with open(file_path, "wb") as f:
-        f.write(uploaded_file.getbuffer())
-
-    # Create iteration record
+    # Create iteration record with Base64 data
     sketch = SketchIteration(
         prototype_page_id=prototype_page.id,
         iteration_number=iteration_number,
-        image_path=str(file_path),
+        image_data=image_base64,
+        image_filename=uploaded_file.name,
         user_instructions=user_instructions
     )
     db.add(sketch)
     db.commit()
+
+    # Save temp file for AI vision analysis (will be deleted after analysis)
+    filename = f"page_{prototype_page.id}_v{iteration_number}_{uploaded_file.name}"
+    temp_file_path = UPLOAD_DIR / filename
+    with open(temp_file_path, "wb") as f:
+        f.write(file_bytes)
 
     # Analyze with AI vision
     with st.spinner("🤖 Analyzing sketch with AI..."):
@@ -168,7 +196,7 @@ def analyze_and_save_sketch(prototype_page, project, ideate_summary, uploaded_fi
 
         # Call vision API
         analysis = ai_service.analyze_image_with_vision(
-            image_path=str(file_path),
+            image_path=str(temp_file_path),
             prompt=analysis_prompt
         )
 
