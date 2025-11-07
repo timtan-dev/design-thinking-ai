@@ -194,8 +194,8 @@ def generate_mockup(prototype_page, project, ideate_summary, final_sketch, style
             user_refinement=additional_instructions or "No additional requirements"
         )
 
-        # Generate image using GPT-4o (returns local temp file path)
-        temp_image_path = ai_service.generate_image_with_gpt4o(
+        # Generate image using GPT-4o (returns tuple: image_path, error_message)
+        temp_image_path, error_message = ai_service.generate_image_with_gpt4o(
             prompt=prompt,
             reference_image_path=None  # No reference for initial generation
         )
@@ -238,7 +238,11 @@ def generate_mockup(prototype_page, project, ideate_summary, final_sketch, style
 
             st.success("✅ Mockup generated successfully!")
         else:
-            st.error("Failed to generate mockup. Please try again.")
+            # Show detailed error message
+            if error_message:
+                st.error(f"❌ Failed to generate mockup:\n\n{error_message}")
+            else:
+                st.error("Failed to generate mockup. Please try again.")
 
 def refine_mockup(prototype_page, project, ideate_summary, final_sketch, previous_mockup, refinement_text, db):
     """Refine existing mockup based on user feedback"""
@@ -264,8 +268,8 @@ def refine_mockup(prototype_page, project, ideate_summary, final_sketch, previou
             specific_improvements=refinement_text
         )
 
-        # Generate refined image with GPT-4o, passing the previous mockup (returns temp file path)
-        temp_image_path = ai_service.generate_image_with_gpt4o(
+        # Generate refined image with GPT-4o, passing the previous mockup (returns tuple: image_path, error_message)
+        temp_image_path, error_message = ai_service.generate_image_with_gpt4o(
             prompt=prompt,
             reference_image_path=str(previous_image_path) if previous_image_path else None
         )
@@ -303,4 +307,8 @@ def refine_mockup(prototype_page, project, ideate_summary, final_sketch, previou
 
             st.success("✅ Refined mockup generated!")
         else:
-            st.error("Failed to generate refined mockup.")
+            # Show detailed error message
+            if error_message:
+                st.error(f"❌ Failed to generate refined mockup:\n\n{error_message}")
+            else:
+                st.error("Failed to generate refined mockup. Please try again.")

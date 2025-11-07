@@ -124,7 +124,7 @@ class AIService:
             print(f"Error generating image: {str(e)}")
             return None
 
-    def generate_image_with_gpt4o(self, prompt: str, reference_image_path: Optional[str] = None) -> Optional[str]:
+    def generate_image_with_gpt4o(self, prompt: str, reference_image_path: Optional[str] = None) -> tuple[Optional[str], Optional[str]]:
         """
         Generate an image using GPT-4o image generation (gpt-image-1) with DALL-E 3 fallback
         For refinements, analyzes the reference image first to enhance prompt
@@ -134,7 +134,8 @@ class AIService:
             reference_image_path: Optional path to reference image for refinement
 
         Returns:
-            Local file path of the generated image, or None if error
+            Tuple of (image_path, error_message). If successful, error_message is None.
+            If failed, image_path is None and error_message contains the error.
         """
         from pathlib import Path
         import requests
@@ -185,10 +186,11 @@ Maintain all other aspects of the design including layout structure, visual styl
                 f.write(image_bytes)
 
             print(f"✅ Successfully generated image with gpt-image-1")
-            return str(temp_file)
+            return str(temp_file), None
 
         except Exception as gpt_error:
-            print(f"⚠️ gpt-image-1 failed: {str(gpt_error)}")
+            gpt_error_msg = str(gpt_error)
+            print(f"⚠️ gpt-image-1 failed: {gpt_error_msg}")
             print("Falling back to DALL-E 3...")
 
             # Fallback to DALL-E 3
@@ -216,15 +218,20 @@ Maintain all other aspects of the design including layout structure, visual styl
                         f.write(image_response.content)
 
                     print(f"✅ Successfully generated image with DALL-E 3 (fallback)")
-                    return str(temp_file)
+                    return str(temp_file), None
                 else:
-                    print(f"Error downloading DALL-E 3 image: HTTP {image_response.status_code}")
-                    return None
+                    error_msg = f"Failed to download image from DALL-E 3 (HTTP {image_response.status_code})"
+                    print(f"Error: {error_msg}")
+                    return None, error_msg
 
             except Exception as dalle_error:
-                print(f"❌ DALL-E 3 also failed: {str(dalle_error)}")
+                dalle_error_msg = str(dalle_error)
+                print(f"❌ DALL-E 3 also failed: {dalle_error_msg}")
                 import traceback
                 traceback.print_exc()
-                return None
+
+                # Return detailed error message
+                full_error = f"Image generation failed:\n- gpt-image-1: {gpt_error_msg}\n- DALL-E 3: {dalle_error_msg}"
+                return None, full_error
 
 
