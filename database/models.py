@@ -185,7 +185,8 @@ class SketchIteration(Base):
     id = Column(Integer, primary_key=True, index=True)
     prototype_page_id = Column(Integer, ForeignKey("prototype_pages.id"), nullable=False)
     iteration_number = Column(Integer, nullable=False)
-    image_path = Column(Text, nullable=False)
+    image_data = Column(Text, nullable=True)  # Base64 encoded image data
+    image_filename = Column(Text, nullable=True)  # Original filename
     user_instructions = Column(Text, nullable=True)
     ai_analysis = Column(Text, nullable=True)
     ai_suggestions = Column(Text, nullable=True)
@@ -204,7 +205,8 @@ class MockupIteration(Base):
     id = Column(Integer, primary_key=True, index=True)
     prototype_page_id = Column(Integer, ForeignKey("prototype_pages.id"), nullable=False)
     iteration_number = Column(Integer, nullable=False)
-    image_path = Column(Text, nullable=False)  # Local path to generated image
+    image_data = Column(Text, nullable=True)  # Base64 encoded image data
+    image_filename = Column(Text, nullable=True)  # Original filename
     generation_prompt = Column(Text, nullable=False)
     style_params = Column(JSON, nullable=True)  # {style: "minimalist", color: "blue", etc.}
     user_refinement = Column(Text, nullable=True)  # User's refinement instructions
