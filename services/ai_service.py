@@ -163,75 +163,60 @@ Maintain all other aspects of the design including layout structure, visual styl
                 print(f"Warning: Could not analyze reference image: {str(e)}")
                 # Continue with original prompt if analysis fails
 
-        # Try gpt-image-1 first
+        # Use DALL-E 3 for image generation
         try:
-            print("Attempting to generate image with gpt-image-1...")
+            print("Generating image with DALL-E 3...")
             response = self.client.images.generate(
-                model="gpt-image-1",
-                prompt=enhanced_prompt,
-                n=1,
-                size="1024x1024"
+                model="dall-e-3",
+                prompt=enhanced_prompt[:4000],  # DALL-E 3 has a 4000 char limit
+                size="1024x1024",
+                quality="standard",
+                n=1
             )
 
-            # Decode base64 image and save to temporary file
-            image_b64 = response.data[0].b64_json
-            image_bytes = base64.b64decode(image_b64)
+            # DALL-E 3 returns a URL, so we need to download it
+            image_url = response.data[0].url
+            print(f"Image generated, downloading from: {image_url[:80]}...")
 
-            # Create a temporary file to return
-            temp_dir = Path("uploads/mockups/temp")
-            temp_dir.mkdir(parents=True, exist_ok=True)
+            # Download the image with retries for network issues
+            max_retries = 3
+            for attempt in range(max_retries):
+                try:
+                    image_response = requests.get(image_url, timeout=60)
+                    if image_response.status_code == 200:
+                        # Save to temporary file
+                        temp_dir = Path("uploads/mockups/temp")
+                        temp_dir.mkdir(parents=True, exist_ok=True)
 
-            temp_file = temp_dir / f"temp_{datetime.now().strftime('%Y%m%d_%H%M%S')}.png"
-            with open(temp_file, 'wb') as f:
-                f.write(image_bytes)
+                        temp_file = temp_dir / f"temp_{datetime.now().strftime('%Y%m%d_%H%M%S')}.png"
+                        with open(temp_file, 'wb') as f:
+                            f.write(image_response.content)
 
-            print(f"✅ Successfully generated image with gpt-image-1")
-            return str(temp_file), None
+                        print(f"✅ Successfully generated and downloaded image")
+                        return str(temp_file), None
+                    else:
+                        error_msg = f"Failed to download image (HTTP {image_response.status_code})"
+                        print(f"Error: {error_msg}")
+                        if attempt < max_retries - 1:
+                            print(f"Retrying... ({attempt + 2}/{max_retries})")
+                            continue
+                        return None, error_msg
+                except requests.exceptions.RequestException as download_error:
+                    if attempt < max_retries - 1:
+                        print(f"Download attempt {attempt + 1} failed, retrying...")
+                        continue
+                    else:
+                        error_msg = f"Network error downloading image after {max_retries} attempts: {str(download_error)}"
+                        print(f"❌ {error_msg}")
+                        return None, error_msg
 
-        except Exception as gpt_error:
-            gpt_error_msg = str(gpt_error)
-            print(f"⚠️ gpt-image-1 failed: {gpt_error_msg}")
-            print("Falling back to DALL-E 3...")
+        except Exception as dalle_error:
+            dalle_error_msg = str(dalle_error)
+            print(f"❌ DALL-E 3 failed: {dalle_error_msg}")
+            import traceback
+            traceback.print_exc()
 
-            # Fallback to DALL-E 3
-            try:
-                response = self.client.images.generate(
-                    model="dall-e-3",
-                    prompt=enhanced_prompt[:4000],  # DALL-E 3 has a 4000 char limit
-                    size="1024x1024",
-                    quality="standard",
-                    n=1
-                )
-
-                # DALL-E 3 returns a URL, so we need to download it
-                image_url = response.data[0].url
-
-                # Download the image
-                image_response = requests.get(image_url, timeout=30)
-                if image_response.status_code == 200:
-                    # Save to temporary file
-                    temp_dir = Path("uploads/mockups/temp")
-                    temp_dir.mkdir(parents=True, exist_ok=True)
-
-                    temp_file = temp_dir / f"temp_{datetime.now().strftime('%Y%m%d_%H%M%S')}.png"
-                    with open(temp_file, 'wb') as f:
-                        f.write(image_response.content)
-
-                    print(f"✅ Successfully generated image with DALL-E 3 (fallback)")
-                    return str(temp_file), None
-                else:
-                    error_msg = f"Failed to download image from DALL-E 3 (HTTP {image_response.status_code})"
-                    print(f"Error: {error_msg}")
-                    return None, error_msg
-
-            except Exception as dalle_error:
-                dalle_error_msg = str(dalle_error)
-                print(f"❌ DALL-E 3 also failed: {dalle_error_msg}")
-                import traceback
-                traceback.print_exc()
-
-                # Return detailed error message
-                full_error = f"Image generation failed:\n- gpt-image-1: {gpt_error_msg}\n- DALL-E 3: {dalle_error_msg}"
-                return None, full_error
+            # Return detailed error message
+            return None, f"Image generation failed: {dalle_error_msg}"
 
 
