@@ -37,15 +37,36 @@ class AIService:
             Generated text response
         """
         try:
-            response = self.client.chat.completions.create(
-                model=self.model,
-                messages=[
+            # o1 models have different parameter requirements
+            is_o1_model = self.model.startswith('o1')
+
+            if is_o1_model:
+                # o1 models don't support system messages or temperature
+                # Combine system and user prompts into a single user message
+                messages = [
+                    {"role": "user", "content": f"{system_prompt}\n\n{user_prompt}"}
+                ]
+
+                # o1 uses max_completion_tokens instead of max_tokens
+                response = self.client.chat.completions.create(
+                    model=self.model,
+                    messages=messages,
+                    max_completion_tokens=self.max_tokens
+                )
+            else:
+                # GPT-4, GPT-5, and other standard models
+                messages = [
                     {"role": "system", "content": system_prompt},
                     {"role": "user", "content": user_prompt}
-                ],
-                temperature=self.temperature,
-                max_tokens=self.max_tokens
-            )
+                ]
+
+                response = self.client.chat.completions.create(
+                    model=self.model,
+                    messages=messages,
+                    temperature=self.temperature,
+                    max_tokens=self.max_tokens
+                )
+
             return response.choices[0].message.content
         except Exception as e:
             return f"Error generating content: {str(e)}"

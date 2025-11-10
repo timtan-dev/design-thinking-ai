@@ -44,6 +44,8 @@ def render_project_header(project):
         available_models = {
             "gpt-5": "GPT-5",
             "gpt-4.1": "GPT-4.1",
+            "o1": "o1",
+            "o1-mini": "o1 Mini",
         }
 
         # Get current model or default

@@ -11,7 +11,8 @@ MODEL_DISPLAY_NAMES = {
     "gpt-4o-mini": "GPT-4o Mini",
     "o1": "o1",
     "o1-mini": "o1 Mini",
-    "gpt-4.1": "GPT-4.1",  # Legacy model
+    "gpt-5": "GPT-5",
+    "gpt-4.1": "GPT-4.1",
 }
 
 def display_model_badge(model_name: str):
