@@ -3,6 +3,8 @@ import streamlit as st
 from config.database import get_db
 from database.models import ResearchData
 from services.ai_service import AIService
+from docx import Document
+import io
 
 RESEARCH_METHODS = {
     "interview": {"name": "Interview", "icon": "🎤"},
@@ -229,25 +231,49 @@ def show_generated_template(method_name, template_content, method_type, project)
 
 
 def save_research_data(project_id, method_type, uploaded_file):
+    """Save uploaded research data and extract text content based on file type"""
     db = get_db()
     try:
-        file_content = uploaded_file.read().decode("utf-8", errors="ignore")
+        # Read file content based on file type
+        file_extension = uploaded_file.name.split('.')[-1].lower()
+
+        if file_extension == 'docx':
+            # Extract text from Word document
+            uploaded_file.seek(0)
+            doc = Document(io.BytesIO(uploaded_file.read()))
+            file_content = '\n'.join([paragraph.text for paragraph in doc.paragraphs])
+        elif file_extension == 'pdf':
+            # For PDF, decode as text (basic extraction - can be improved later)
+            uploaded_file.seek(0)
+            file_content = uploaded_file.read().decode("utf-8", errors="ignore")
+        else:
+            # For txt, csv, and other text files
+            uploaded_file.seek(0)
+            file_content = uploaded_file.read().decode("utf-8", errors="ignore")
+
+        # Save physical file
         upload_dir = "uploads"
         os.makedirs(upload_dir, exist_ok=True)
         file_path = os.path.join(upload_dir, f"{project_id}_{method_type}_{uploaded_file.name}")
+
+        uploaded_file.seek(0)
         with open(file_path, "wb") as f:
-            uploaded_file.seek(0)
             f.write(uploaded_file.read())
+
+        # Save to database with extracted text content
         from database.models import ResearchData
         research_data = ResearchData(
             project_id=project_id,
             method_type=method_type,
             file_path=file_path,
-            file_content=file_content,
+            file_content=file_content,  # Now contains extracted text, not binary data
             processed=False
         )
         db.add(research_data)
         db.commit()
         st.success(f"{uploaded_file.name} uploaded successfully!")
+    except Exception as e:
+        st.error(f"Error uploading file: {str(e)}")
+        db.rollback()
     finally:
         db.close()
