@@ -95,6 +95,7 @@ def open_brainstorming_dialog(project):
                     success = generate_seed_ideas(project.id)
                     db.close()
                     if success:
+                        st.toast("✅ Seeds regenerated! Reopen Brainstorming to see the new ideas.", icon="✨")
                         st.rerun()
             else:
                 # No seeds yet - show generate button
@@ -102,6 +103,7 @@ def open_brainstorming_dialog(project):
                     success = generate_seed_ideas(project.id)
                     db.close()
                     if success:
+                        st.toast("✅ Seed ideas generated! Reopen Brainstorming to see the results.", icon="✨")
                         st.rerun()
 
     # Tab 2: Real-time Idea Expansion
