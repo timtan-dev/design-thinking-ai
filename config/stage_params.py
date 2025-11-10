@@ -1,6 +1,14 @@
 """
 Stage-specific AI parameters configuration
 Different stages require different creativity/consistency levels
+
+Parameter support by model:
+- GPT-5: Only max_tokens (no temperature/top_p)
+- Claude: Only temperature and max_tokens (no top_p)
+- GPT-4.1: temperature, top_p, and max_tokens
+- Grok-4: temperature, top_p, and max_tokens
+
+The ai_service.py automatically filters parameters based on the model.
 """
 
 # Define Stage Parameters

@@ -1,7 +1,7 @@
 """
 AI Service - Multi-Provider AI Integration
 Wrapper for all AI-powered generation tasks using LangChain
-Supports: OpenAI (GPT, o1), Anthropic (Claude), xAI (Grok)
+Supports: OpenAI (GPT-4.1, GPT-5), Anthropic (Claude), xAI (Grok)
 """
 
 from openai import OpenAI
@@ -53,55 +53,81 @@ class AIService:
         """
         Initialize the appropriate LangChain chat model based on model name
 
+        Model-specific parameter handling:
+        - GPT-5: No temperature/top_p (only max_tokens)
+        - Claude: Only temperature (no top_p)
+        - GPT-4.1: temperature + top_p
+        - Grok-4: temperature + top_p
+
         Returns:
             LangChain chat model instance
         """
-        # Build kwargs for model initialization
-        base_kwargs = {
-            "temperature": self.temperature,
-            "max_tokens": self.max_tokens,
-        }
-
-        # Add top_p if provided (only supported by some models)
-        if self.top_p is not None:
-            base_kwargs["top_p"] = self.top_p
-
-        # OpenAI models (GPT-4, GPT-5, o1, etc.)
-        if self.model.startswith(('gpt', 'o1')):
+        # GPT-5 - No parameters except max_tokens
+        if self.model == 'gpt-5':
             return ChatOpenAI(
                 model=self.model,
                 api_key=Settings.OPENAI_API_KEY,
-                **base_kwargs
+                max_tokens=self.max_tokens
             )
 
-        # Anthropic models (Claude)
+        # Anthropic models (Claude) - Only temperature, no top_p
         elif self.model.startswith('claude'):
             if not Settings.ANTHROPIC_API_KEY:
                 raise ValueError("ANTHROPIC_API_KEY not set in environment variables")
             return ChatAnthropic(
                 model=self.model,
                 api_key=Settings.ANTHROPIC_API_KEY,
-                **base_kwargs
+                temperature=self.temperature,
+                max_tokens=self.max_tokens
             )
 
-        # xAI models (Grok) - Using OpenAI-compatible API
+        # xAI models (Grok) - temperature + top_p
         elif self.model.startswith('grok'):
             if not Settings.XAI_API_KEY:
                 raise ValueError("XAI_API_KEY not set in environment variables")
-            # xAI uses OpenAI-compatible API
+
+            kwargs = {
+                "temperature": self.temperature,
+                "max_tokens": self.max_tokens,
+            }
+            if self.top_p is not None:
+                kwargs["top_p"] = self.top_p
+
             return ChatOpenAI(
                 model=self.model,
                 api_key=Settings.XAI_API_KEY,
-                base_url="https://api.x.ai/v1",  # xAI API endpoint
-                **base_kwargs
+                base_url="https://api.x.ai/v1",
+                **kwargs
             )
 
-        else:
-            # Default to OpenAI
+        # OpenAI models (GPT-4.1, etc.) - temperature + top_p
+        elif self.model.startswith('gpt'):
+            kwargs = {
+                "temperature": self.temperature,
+                "max_tokens": self.max_tokens,
+            }
+            if self.top_p is not None:
+                kwargs["top_p"] = self.top_p
+
             return ChatOpenAI(
                 model=self.model,
                 api_key=Settings.OPENAI_API_KEY,
-                **base_kwargs
+                **kwargs
+            )
+
+        else:
+            # Default to OpenAI with full parameters
+            kwargs = {
+                "temperature": self.temperature,
+                "max_tokens": self.max_tokens,
+            }
+            if self.top_p is not None:
+                kwargs["top_p"] = self.top_p
+
+            return ChatOpenAI(
+                model=self.model,
+                api_key=Settings.OPENAI_API_KEY,
+                **kwargs
             )
 
     def _call_openai(self, system_prompt: str, user_prompt: str) -> Tuple[str, Dict[str, Any]]:
@@ -109,7 +135,7 @@ class AIService:
         Make a call to AI provider via LangChain
 
         LangChain automatically handles:
-        - o1 model parameter differences (max_completion_tokens, no temperature)
+        - Model-specific parameter requirements (GPT-5: no params, Claude: no top_p)
         - Provider-specific API formats
         - System message compatibility
 
@@ -136,8 +162,8 @@ class AIService:
             ]
 
             # LangChain automatically handles model-specific requirements:
-            # - o1 models: converts system messages, uses max_completion_tokens
-            # - Claude: uses Anthropic API format
+            # - GPT-5: no temperature/top_p parameters
+            # - Claude: uses Anthropic API format, no top_p
             # - Grok: uses xAI API format
             response = self.llm.invoke(messages)
 
