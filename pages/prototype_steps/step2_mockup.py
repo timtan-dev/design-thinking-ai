@@ -3,6 +3,7 @@
 import streamlit as st
 from database.models import MockupIteration, SketchIteration
 from services.ai_service import AIService
+from config.stage_params import PROTOTYPE_STAGE_PARAMS
 from utils.time_utils import format_local_time
 from prompts.prototype.mockup_generation import GENERATE_MOCKUP_PROMPT, REFINE_MOCKUP_PROMPT
 from pathlib import Path
@@ -171,7 +172,12 @@ def generate_mockup(prototype_page, project, ideate_summary, final_sketch, style
     """Generate initial mockup using DALL-E/GPT-4o"""
 
     with st.spinner("🎨 Generating mockup with AI... This may take a moment."):
-        ai_service = AIService(model=project.preferred_model)
+        ai_service = AIService(
+            model=project.preferred_model,
+            temperature=PROTOTYPE_STAGE_PARAMS["temperature"],
+            top_p=PROTOTYPE_STAGE_PARAMS["top_p"],
+            max_tokens=PROTOTYPE_STAGE_PARAMS["max_tokens"]
+        )
 
         # Get sketch analysis for context
         sketch_description = final_sketch.ai_analysis if final_sketch else "User sketch"
@@ -248,7 +254,12 @@ def refine_mockup(prototype_page, project, ideate_summary, final_sketch, previou
     """Refine existing mockup based on user feedback"""
 
     with st.spinner("🔄 Generating refined mockup..."):
-        ai_service = AIService(model=project.preferred_model)
+        ai_service = AIService(
+            model=project.preferred_model,
+            temperature=PROTOTYPE_STAGE_PARAMS["temperature"],
+            top_p=PROTOTYPE_STAGE_PARAMS["top_p"],
+            max_tokens=PROTOTYPE_STAGE_PARAMS["max_tokens"]
+        )
 
         # Get previous style params
         prev_style = previous_mockup.style_params or {}

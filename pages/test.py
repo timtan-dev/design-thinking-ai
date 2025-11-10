@@ -3,6 +3,7 @@
 import streamlit as st
 from database.models import UserTest, TestFeedback, TestInsight, PrototypePage, StageSummary
 from services.ai_service import AIService
+from config.stage_params import TEST_STAGE_PARAMS
 from utils.time_utils import format_local_time
 from config.database import get_db
 
@@ -232,7 +233,12 @@ def analyze_test_feedback(user_test, project, page_name, db):
         feedback_data += f"{item.feedback_text}\n"
 
     # Call AI service
-    ai_service = AIService(model=project.preferred_model)
+    ai_service = AIService(
+        model=project.preferred_model,
+        temperature=TEST_STAGE_PARAMS["temperature"],
+        top_p=TEST_STAGE_PARAMS["top_p"],
+        max_tokens=TEST_STAGE_PARAMS["max_tokens"]
+    )
 
     from prompts.test.feedback_analysis import ANALYZE_FEEDBACK_PROMPT
 
@@ -366,7 +372,12 @@ def generate_test_stage_summary(project, db):
             all_test_results += f"{insight.insight_text}\n\n"
 
     # Call AI to generate summary
-    ai_service = AIService(model=project.preferred_model)
+    ai_service = AIService(
+        model=project.preferred_model,
+        temperature=TEST_STAGE_PARAMS["temperature"],
+        top_p=TEST_STAGE_PARAMS["top_p"],
+        max_tokens=TEST_STAGE_PARAMS["max_tokens"]
+    )
 
     from prompts.test.feedback_analysis import GENERATE_TEST_SUMMARY_PROMPT
 

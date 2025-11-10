@@ -3,6 +3,7 @@
 import streamlit as st
 from database.models import MockupIteration
 from services.ai_service import AIService
+from config.stage_params import PROTOTYPE_STAGE_PARAMS
 from prompts.prototype.code_generation import GENERATE_HTML_CSS_PROMPT, GENERATE_TAILWIND_HTML_PROMPT
 
 def render_code_step(prototype_page, project, db):
@@ -96,7 +97,12 @@ def generate_code(prototype_page, project, final_mockup, framework, db):
     """Generate HTML/CSS code from mockup"""
 
     with st.spinner("💻 Generating code... This may take a moment."):
-        ai_service = AIService(model=project.preferred_model)
+        ai_service = AIService(
+            model=project.preferred_model,
+            temperature=PROTOTYPE_STAGE_PARAMS["temperature"],
+            top_p=PROTOTYPE_STAGE_PARAMS["top_p"],
+            max_tokens=PROTOTYPE_STAGE_PARAMS["max_tokens"]
+        )
 
         # Create mockup description (could use vision API to analyze the mockup image)
         mockup_description = f"""

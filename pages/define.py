@@ -2,6 +2,7 @@ import streamlit as st
 from config.database import get_db
 from database.models import GeneratedContent, ResearchData, Project, StageSummary
 from services.ai_service import AIService
+from config.stage_params import DEFINE_STAGE_PARAMS
 from datetime import datetime
 from utils.time_utils import format_local_time
 from utils.model_badge import display_model_badge
@@ -51,7 +52,12 @@ def generate_stage_summary(project_id):
 
         # Generate summary using AI
         from prompts.summary import DEFINE_STAGE_SUMMARY_PROMPT
-        ai_service = AIService(model=project.preferred_model)
+        ai_service = AIService(
+            model=project.preferred_model,
+            temperature=DEFINE_STAGE_PARAMS["temperature"],
+            top_p=DEFINE_STAGE_PARAMS["top_p"],
+            max_tokens=DEFINE_STAGE_PARAMS["max_tokens"]
+        )
 
         user_prompt = f"""
         Analyze and synthesize the following Define stage analyses into a problem statement.
@@ -239,9 +245,14 @@ def generate_analysis(project_id, content_type, content_name, research_data):
 
         # Show generating message
         with st.spinner(f"🤖 Generating {content_name}... This may take a moment."):
-            # Initialize AI service with project's preferred model
+            # Initialize AI service with project's preferred model and Define stage parameters
             try:
-                ai_service = AIService(model=project.preferred_model)
+                ai_service = AIService(
+                    model=project.preferred_model,
+                    temperature=DEFINE_STAGE_PARAMS["temperature"],
+                    top_p=DEFINE_STAGE_PARAMS["top_p"],
+                    max_tokens=DEFINE_STAGE_PARAMS["max_tokens"]
+                )
             except ValueError as e:
                 # Handle missing API key error
                 if "API_KEY not set" in str(e):

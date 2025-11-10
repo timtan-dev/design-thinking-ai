@@ -3,6 +3,7 @@ import streamlit as st
 from config.database import get_db
 from database.models import ResearchData
 from services.ai_service import AIService
+from config.stage_params import EMPATHISE_STAGE_PARAMS
 from docx import Document
 import io
 
@@ -166,7 +167,12 @@ def generate_template(method_type, method_name, project):
 
     if st.button(button_label, key=f"gen_btn_{method_type}", type="primary", use_container_width=True):
         with st.spinner(f"Generating {method_name} template for {project.name}..."):
-            ai_service = AIService(model=project.preferred_model)
+            ai_service = AIService(
+                model=project.preferred_model,
+                temperature=EMPATHISE_STAGE_PARAMS["temperature"],
+                top_p=EMPATHISE_STAGE_PARAMS["top_p"],
+                max_tokens=EMPATHISE_STAGE_PARAMS["max_tokens"]
+            )
 
             user_prompt = f"""
             Generate a professional {method_name} template for {additional_context}.

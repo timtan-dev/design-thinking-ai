@@ -3,6 +3,7 @@
 import streamlit as st
 from database.models import SketchIteration
 from services.ai_service import AIService
+from config.stage_params import PROTOTYPE_STAGE_PARAMS
 from utils.time_utils import format_local_time
 from prompts.prototype.sketch_analysis import ANALYZE_SKETCH_PROMPT, SUGGEST_IMPROVEMENTS_PROMPT
 import os
@@ -181,7 +182,12 @@ def analyze_and_save_sketch(prototype_page, project, ideate_summary, uploaded_fi
 
     # Analyze with AI vision
     with st.spinner("🤖 Analyzing sketch with AI..."):
-        ai_service = AIService(model=project.preferred_model)
+        ai_service = AIService(
+            model=project.preferred_model,
+            temperature=PROTOTYPE_STAGE_PARAMS["temperature"],
+            top_p=PROTOTYPE_STAGE_PARAMS["top_p"],
+            max_tokens=PROTOTYPE_STAGE_PARAMS["max_tokens"]
+        )
 
         # Prepare prompts
         ideate_text = ideate_summary.summary_text if ideate_summary else "No ideate summary available"

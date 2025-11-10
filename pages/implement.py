@@ -8,6 +8,7 @@ from database.models import (
     StageSummary, UserTest, TestInsight
 )
 from services.ai_service import AIService
+from config.stage_params import IMPLEMENT_STAGE_PARAMS
 from utils.time_utils import format_local_time
 from config.database import get_db
 
@@ -126,7 +127,12 @@ def generate_roadmap(project, team_size, sprint_duration, target_launch_weeks, d
         test_priorities = gather_test_priorities(project, db)
 
         # Call AI service
-        ai_service = AIService(model=project.preferred_model)
+        ai_service = AIService(
+            model=project.preferred_model,
+            temperature=IMPLEMENT_STAGE_PARAMS["temperature"],
+            top_p=IMPLEMENT_STAGE_PARAMS["top_p"],
+            max_tokens=IMPLEMENT_STAGE_PARAMS["max_tokens"]
+        )
 
         from prompts.implement.roadmap_generation import GENERATE_ROADMAP_PROMPT
 
@@ -312,7 +318,12 @@ def generate_tasks_from_roadmap(project, roadmap, db):
         test_priorities = gather_test_priorities(project, db)
 
         # Call AI service
-        ai_service = AIService(model=project.preferred_model)
+        ai_service = AIService(
+            model=project.preferred_model,
+            temperature=IMPLEMENT_STAGE_PARAMS["temperature"],
+            top_p=IMPLEMENT_STAGE_PARAMS["top_p"],
+            max_tokens=IMPLEMENT_STAGE_PARAMS["max_tokens"]
+        )
 
         from prompts.implement.task_generation import GENERATE_TASKS_PROMPT
 
