@@ -164,7 +164,7 @@ def generate_template(method_type, method_name, project):
 
     if st.button(button_label, key=f"gen_btn_{method_type}", type="primary", use_container_width=True):
         with st.spinner(f"Generating {method_name} template for {project.name}..."):
-            ai_service = AIService()
+            ai_service = AIService(model=project.preferred_model)
 
             user_prompt = f"""
             Generate a professional {method_name} template for {additional_context}.

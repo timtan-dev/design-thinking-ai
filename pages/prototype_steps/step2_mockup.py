@@ -171,7 +171,7 @@ def generate_mockup(prototype_page, project, ideate_summary, final_sketch, style
     """Generate initial mockup using DALL-E/GPT-4o"""
 
     with st.spinner("🎨 Generating mockup with AI... This may take a moment."):
-        ai_service = AIService()
+        ai_service = AIService(model=project.preferred_model)
 
         # Get sketch analysis for context
         sketch_description = final_sketch.ai_analysis if final_sketch else "User sketch"
@@ -248,7 +248,7 @@ def refine_mockup(prototype_page, project, ideate_summary, final_sketch, previou
     """Refine existing mockup based on user feedback"""
 
     with st.spinner("🔄 Generating refined mockup..."):
-        ai_service = AIService()
+        ai_service = AIService(model=project.preferred_model)
 
         # Get previous style params
         prev_style = previous_mockup.style_params or {}

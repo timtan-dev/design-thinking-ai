@@ -126,7 +126,7 @@ def generate_roadmap(project, team_size, sprint_duration, target_launch_weeks, d
         test_priorities = gather_test_priorities(project, db)
 
         # Call AI service
-        ai_service = AIService()
+        ai_service = AIService(model=project.preferred_model)
 
         from prompts.implement.roadmap_generation import GENERATE_ROADMAP_PROMPT
 
@@ -312,7 +312,7 @@ def generate_tasks_from_roadmap(project, roadmap, db):
         test_priorities = gather_test_priorities(project, db)
 
         # Call AI service
-        ai_service = AIService()
+        ai_service = AIService(model=project.preferred_model)
 
         from prompts.implement.task_generation import GENERATE_TASKS_PROMPT
 

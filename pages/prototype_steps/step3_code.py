@@ -96,7 +96,7 @@ def generate_code(prototype_page, project, final_mockup, framework, db):
     """Generate HTML/CSS code from mockup"""
 
     with st.spinner("💻 Generating code... This may take a moment."):
-        ai_service = AIService()
+        ai_service = AIService(model=project.preferred_model)
 
         # Create mockup description (could use vision API to analyze the mockup image)
         mockup_description = f"""

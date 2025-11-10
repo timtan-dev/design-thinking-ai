@@ -181,7 +181,7 @@ def analyze_and_save_sketch(prototype_page, project, ideate_summary, uploaded_fi
 
     # Analyze with AI vision
     with st.spinner("🤖 Analyzing sketch with AI..."):
-        ai_service = AIService()
+        ai_service = AIService(model=project.preferred_model)
 
         # Prepare prompts
         ideate_text = ideate_summary.summary_text if ideate_summary else "No ideate summary available"

@@ -13,10 +13,15 @@ import base64
 class AIService:
     """AI service for generating content using OpenAI API"""
 
-    def __init__(self):
-        """Initialize OpenAI client"""
+    def __init__(self, model: Optional[str] = None):
+        """
+        Initialize OpenAI client
+
+        Args:
+            model: Optional model override. If not provided, uses Settings.OPENAI_MODEL
+        """
         self.client = OpenAI(api_key=Settings.OPENAI_API_KEY)
-        self.model = Settings.OPENAI_MODEL
+        self.model = model if model else Settings.OPENAI_MODEL
         self.temperature = Settings.OPENAI_TEMPERATURE
         self.max_tokens = Settings.OPENAI_MAX_TOKENS
 

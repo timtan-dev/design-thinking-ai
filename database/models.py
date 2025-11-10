@@ -17,6 +17,7 @@ class Project(Base):
     area = Column(String(255), nullable=False)
     goal = Column(Text, nullable=False)
     current_stage = Column(Integer, default=1)  # 1-6 for the six stages
+    preferred_model = Column(String(100), default="gpt-4o")  # AI model preference for this project
     created_at = Column(DateTime, default=datetime.utcnow)
     updated_at = Column(DateTime, default=datetime.utcnow, onupdate=datetime.utcnow)
     user_id = Column(String(255), nullable=True)  # For future multi-user support
@@ -72,6 +73,7 @@ class GeneratedContent(Base):
     project_id = Column(Integer, ForeignKey("projects.id"), nullable=False)
     content_type = Column(String(100), nullable=False)  # empathy_map, persona, journey_map, etc.
     content = Column(Text, nullable=False)
+    model_used = Column(String(100), nullable=True)  # AI model used to generate this content
     created_at = Column(DateTime, default=datetime.utcnow)
 
     # Relationships

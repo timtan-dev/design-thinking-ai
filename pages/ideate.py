@@ -182,7 +182,7 @@ def generate_seed_ideas(project_id):
         problem_summary = latest_summary.summary_text if latest_summary else f"Solve problems in {project.area} to achieve {project.goal}"
         
         with st.spinner("🤖 Generating seed ideas... This may take a moment."):
-            ai_service = AIService()
+            ai_service = AIService(model=project.preferred_model)
             
             user_prompt = f"Generate 15 diverse solution ideas for the project."
             
@@ -251,7 +251,7 @@ def expand_idea(project_id, user_idea):
         problem_summary = latest_summary.summary_text if latest_summary else f"{project.goal}"
 
         with st.spinner("🔍 Expanding your idea..."):
-            ai_service = AIService()
+            ai_service = AIService(model=project.preferred_model)
 
             system_prompt = BRAINSTORM_EXPAND_IDEA_PROMPT.format(
                 project_name=project.name,
@@ -312,7 +312,7 @@ def categorize_ideas(project_id):
             if idea.idea_type in ('user_input', 'expansion'):
                 ideas_text += f"- {idea.idea_text}\n"
 
-        ai_service = AIService()
+        ai_service = AIService(model=project.preferred_model)
 
         system_prompt = BRAINSTORM_CATEGORIZE_IDEAS_PROMPT.format(
             project_name=project.name,
@@ -410,7 +410,7 @@ def generate_ideate_summary(project_id):
 
         # Generate summary using AI
         from prompts.summary import IDEATE_STAGE_SUMMARY_PROMPT
-        ai_service = AIService()
+        ai_service = AIService(model=project.preferred_model)
 
         system_prompt = IDEATE_STAGE_SUMMARY_PROMPT.format(
             project_name=project.name,

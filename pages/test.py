@@ -232,7 +232,7 @@ def analyze_test_feedback(user_test, project, page_name, db):
         feedback_data += f"{item.feedback_text}\n"
 
     # Call AI service
-    ai_service = AIService()
+    ai_service = AIService(model=project.preferred_model)
 
     from prompts.test.feedback_analysis import ANALYZE_FEEDBACK_PROMPT
 
@@ -366,7 +366,7 @@ def generate_test_stage_summary(project, db):
             all_test_results += f"{insight.insight_text}\n\n"
 
     # Call AI to generate summary
-    ai_service = AIService()
+    ai_service = AIService(model=project.preferred_model)
 
     from prompts.test.feedback_analysis import GENERATE_TEST_SUMMARY_PROMPT
 

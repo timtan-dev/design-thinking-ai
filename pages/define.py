@@ -4,6 +4,7 @@ from database.models import GeneratedContent, ResearchData, Project, StageSummar
 from services.ai_service import AIService
 from datetime import datetime
 from utils.time_utils import format_local_time
+from utils.model_badge import display_model_badge
 
 ANALYSIS_METHODS = {
     "empathy_map": {"name": "Empathy Map", "icon": "🧩"},
@@ -49,7 +50,7 @@ def generate_stage_summary(project_id):
 
         # Generate summary using AI
         from prompts.summary import DEFINE_STAGE_SUMMARY_PROMPT
-        ai_service = AIService()
+        ai_service = AIService(model=project.preferred_model)
 
         user_prompt = f"""
         Analyze and synthesize the following Define stage analyses into a problem statement.
@@ -156,6 +157,11 @@ def open_analysis_dialog(project, method_key, method_name, research_data):
             display_number = total_count - idx + 1
 
             with st.expander(f"📄 Analysis #{display_number} - Generated on {created_time}", expanded=(idx == 1)):
+                # Display model badge
+                display_model_badge(content.model_used)
+                st.divider()
+
+                # Display content
                 st.markdown(content.content)
 
                 # Add download button
@@ -214,8 +220,8 @@ def generate_analysis(project_id, content_type, content_name, research_data):
 
         # Show generating message
         with st.spinner(f"🤖 Generating {content_name}... This may take a moment."):
-            # Initialize AI service
-            ai_service = AIService()
+            # Initialize AI service with project's preferred model
+            ai_service = AIService(model=project.preferred_model)
 
             # Format research data
             research_section = ""
@@ -245,11 +251,12 @@ def generate_analysis(project_id, content_type, content_name, research_data):
                 st.error("Failed to generate content. Please try again.")
                 return
 
-            # Save to database
+            # Save to database with model info
             new_content = GeneratedContent(
                 project_id=project_id,
                 content_type=content_type,
-                content=generated_content
+                content=generated_content,
+                model_used=project.preferred_model
             )
             db.add(new_content)
             db.commit()
