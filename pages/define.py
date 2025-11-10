@@ -185,12 +185,18 @@ def open_analysis_dialog(project, method_key, method_name, research_data):
         st.info(f"📊 {len(research_data)} research file(s) will be analyzed")
 
     if st.button("✨ Generate New Analysis", key=f"gen_btn_{method_key}", type="primary", use_container_width=True):
-        generate_analysis(project.id, method_key, method_name, research_data)
-        st.rerun()
+        success = generate_analysis(project.id, method_key, method_name, research_data)
+        if success:
+            st.rerun()
 
 
 def generate_analysis(project_id, content_type, content_name, research_data):
-    """Generate AI-powered analysis using uploaded research data"""
+    """
+    Generate AI-powered analysis using uploaded research data
+
+    Returns:
+        bool: True if successful, False if failed
+    """
 
     # Import the appropriate prompt based on content type
     if content_type == "empathy_map":
@@ -207,7 +213,7 @@ def generate_analysis(project_id, content_type, content_name, research_data):
         from prompts.define.stakeholder_map import STAKEHOLDER_MAP_PROMPT as ANALYSIS_PROMPT
     else:
         st.error(f"Unknown analysis type: {content_type}")
-        return
+        return False
 
     db = get_db()
 
@@ -216,12 +222,26 @@ def generate_analysis(project_id, content_type, content_name, research_data):
         project = db.query(Project).filter(Project.id == project_id).first()
         if not project:
             st.error("Project not found!")
-            return
+            return False
 
         # Show generating message
         with st.spinner(f"🤖 Generating {content_name}... This may take a moment."):
             # Initialize AI service with project's preferred model
-            ai_service = AIService(model=project.preferred_model)
+            try:
+                ai_service = AIService(model=project.preferred_model)
+            except ValueError as e:
+                # Handle missing API key error
+                if "API_KEY not set" in str(e):
+                    model_name = project.preferred_model
+                    if model_name.startswith('claude'):
+                        st.error("❌ **Anthropic API Key Required**\n\nTo use Claude models, add your API key to `.env`:\n```\nANTHROPIC_API_KEY=sk-ant-your-key-here\n```\n\nGet your key at: https://console.anthropic.com/")
+                    elif model_name.startswith('grok'):
+                        st.error("❌ **xAI API Key Required**\n\nTo use Grok models, add your API key to `.env`:\n```\nXAI_API_KEY=xai-your-key-here\n```\n\nGet your key at: https://x.ai/api")
+                    else:
+                        st.error("❌ **OpenAI API Key Required**\n\nTo use OpenAI models, add your API key to `.env`:\n```\nOPENAI_API_KEY=sk-proj-your-key-here\n```\n\nGet your key at: https://platform.openai.com/api-keys")
+                else:
+                    st.error(f"Configuration error: {str(e)}")
+                return False
 
             # Format research data
             research_section = ""
@@ -249,7 +269,7 @@ def generate_analysis(project_id, content_type, content_name, research_data):
 
             if not generated_content:
                 st.error("Failed to generate content. Please try again.")
-                return
+                return False
 
             # Save to database with model info
             new_content = GeneratedContent(
@@ -265,10 +285,12 @@ def generate_analysis(project_id, content_type, content_name, research_data):
             generate_stage_summary(project_id)
 
             st.success(f"✅ {content_name} generated successfully!")
+            return True
 
     except Exception as e:
         st.error(f"Error generating {content_name}: {str(e)}")
         db.rollback()
+        return False
 
     finally:
         db.close()
