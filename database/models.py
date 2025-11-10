@@ -3,7 +3,7 @@ Database Models
 SQLAlchemy ORM models for all database tables
 """
 
-from sqlalchemy import Column, Integer, String, Text, DateTime, ForeignKey, Boolean, JSON
+from sqlalchemy import Column, Integer, String, Text, DateTime, ForeignKey, Boolean, JSON, Float
 from sqlalchemy.orm import relationship
 from datetime import datetime
 from config.database import Base
@@ -74,6 +74,13 @@ class GeneratedContent(Base):
     content_type = Column(String(100), nullable=False)  # empathy_map, persona, journey_map, etc.
     content = Column(Text, nullable=False)
     model_used = Column(String(100), nullable=True)  # AI model used to generate this content
+
+    # Usage tracking
+    duration_seconds = Column(Float, nullable=True)  # Time taken for generation
+    input_tokens = Column(Integer, nullable=True)  # Number of input/prompt tokens
+    output_tokens = Column(Integer, nullable=True)  # Number of output/completion tokens
+    cost_usd = Column(Float, nullable=True)  # Calculated cost in USD
+
     created_at = Column(DateTime, default=datetime.utcnow)
 
     # Relationships
@@ -125,6 +132,13 @@ class BrainstormIdea(Base):
     parent_id = Column(Integer, ForeignKey("brainstorm_ideas.id"), nullable=True)  # For expansions
     order_index = Column(Integer, default=0)  # For maintaining order
     model_used = Column(String(100), nullable=True)  # AI model used to generate this idea
+
+    # Usage tracking
+    duration_seconds = Column(Float, nullable=True)  # Time taken for generation
+    input_tokens = Column(Integer, nullable=True)  # Number of input/prompt tokens
+    output_tokens = Column(Integer, nullable=True)  # Number of output/completion tokens
+    cost_usd = Column(Float, nullable=True)  # Calculated cost in USD
+
     created_at = Column(DateTime, default=datetime.utcnow)
 
     # Relationships

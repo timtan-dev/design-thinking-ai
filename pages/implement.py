@@ -141,7 +141,7 @@ def generate_roadmap(project, team_size, sprint_duration, target_launch_weeks, d
             test_priorities=test_priorities
         )
 
-        roadmap_json = ai_service._call_openai(
+        roadmap_json, usage_metadata = ai_service._call_openai(
             "You are an expert software architect and project manager creating strategic implementation roadmaps.",
             prompt
         )
@@ -323,7 +323,7 @@ def generate_tasks_from_roadmap(project, roadmap, db):
             test_priorities=test_priorities
         )
 
-        tasks_json = ai_service._call_openai(
+        tasks_json, usage_metadata = ai_service._call_openai(
             "You are an expert software developer and project planner creating detailed implementation tasks.",
             prompt
         )

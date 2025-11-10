@@ -122,7 +122,7 @@ def generate_code(prototype_page, project, final_mockup, framework, db):
             )
 
         # Generate code
-        code_output = ai_service._call_openai(
+        code_output, usage_metadata = ai_service._call_openai(
             "You are an expert frontend developer generating production-ready HTML/CSS code.",
             prompt
         )

@@ -185,7 +185,7 @@ def generate_template(method_type, method_name, project):
                 project_goal=project.goal,
                 tone=tone
             )
-            template_content = ai_service._call_openai(system_prompt, user_prompt)
+            template_content, usage_metadata = ai_service._call_openai(system_prompt, user_prompt)
 
             # Show generated template
             show_generated_template(method_name, template_content, method_type, project)

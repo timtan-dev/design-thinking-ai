@@ -243,7 +243,7 @@ def analyze_test_feedback(user_test, project, page_name, db):
         feedback_data=feedback_data
     )
 
-    analysis_result = ai_service._call_openai(
+    analysis_result, usage_metadata = ai_service._call_openai(
         "You are an expert UX researcher specializing in analyzing user feedback and providing actionable insights.",
         prompt
     )
@@ -376,7 +376,7 @@ def generate_test_stage_summary(project, db):
         all_test_results=all_test_results
     )
 
-    summary_text = ai_service._call_openai(
+    summary_text, usage_metadata = ai_service._call_openai(
         "You are a UX research director creating executive summaries of user testing results.",
         prompt
     )

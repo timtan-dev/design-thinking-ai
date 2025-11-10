@@ -6,10 +6,12 @@ Supports: OpenAI (GPT, o1), Anthropic (Claude), xAI (Grok)
 
 from openai import OpenAI
 from config.settings import Settings
-from typing import Dict, Any, Optional, Union
+from typing import Dict, Any, Optional, Union, Tuple
 from datetime import datetime
 import json
 import base64
+import time
+from config.model_pricing import calculate_cost
 
 # LangChain imports
 from langchain_openai import ChatOpenAI
@@ -20,16 +22,26 @@ from langchain_core.language_models.chat_models import BaseChatModel
 class AIService:
     """AI service for generating content using multiple AI providers via LangChain"""
 
-    def __init__(self, model: Optional[str] = None):
+    def __init__(
+        self,
+        model: Optional[str] = None,
+        temperature: Optional[float] = None,
+        top_p: Optional[float] = None,
+        max_tokens: Optional[int] = None
+    ):
         """
         Initialize AI service with LangChain multi-provider support
 
         Args:
             model: Optional model override. If not provided, uses Settings.OPENAI_MODEL
+            temperature: Optional temperature override (0.0-1.0). Controls randomness.
+            top_p: Optional top_p override (0.0-1.0). Controls diversity via nucleus sampling.
+            max_tokens: Optional max_tokens override. Maximum tokens to generate.
         """
         self.model = model if model else Settings.OPENAI_MODEL
-        self.temperature = Settings.OPENAI_TEMPERATURE
-        self.max_tokens = Settings.OPENAI_MAX_TOKENS
+        self.temperature = temperature if temperature is not None else Settings.OPENAI_TEMPERATURE
+        self.top_p = top_p  # Will be None if not provided
+        self.max_tokens = max_tokens if max_tokens is not None else Settings.OPENAI_MAX_TOKENS
 
         # Initialize the appropriate LangChain chat model based on model name
         self.llm = self._initialize_llm()
@@ -44,13 +56,22 @@ class AIService:
         Returns:
             LangChain chat model instance
         """
+        # Build kwargs for model initialization
+        base_kwargs = {
+            "temperature": self.temperature,
+            "max_tokens": self.max_tokens,
+        }
+
+        # Add top_p if provided (only supported by some models)
+        if self.top_p is not None:
+            base_kwargs["top_p"] = self.top_p
+
         # OpenAI models (GPT-4, GPT-5, o1, etc.)
         if self.model.startswith(('gpt', 'o1')):
             return ChatOpenAI(
                 model=self.model,
-                temperature=self.temperature,
-                max_tokens=self.max_tokens,
-                api_key=Settings.OPENAI_API_KEY
+                api_key=Settings.OPENAI_API_KEY,
+                **base_kwargs
             )
 
         # Anthropic models (Claude)
@@ -59,9 +80,8 @@ class AIService:
                 raise ValueError("ANTHROPIC_API_KEY not set in environment variables")
             return ChatAnthropic(
                 model=self.model,
-                temperature=self.temperature,
-                max_tokens=self.max_tokens,
-                api_key=Settings.ANTHROPIC_API_KEY
+                api_key=Settings.ANTHROPIC_API_KEY,
+                **base_kwargs
             )
 
         # xAI models (Grok) - Using OpenAI-compatible API
@@ -71,22 +91,20 @@ class AIService:
             # xAI uses OpenAI-compatible API
             return ChatOpenAI(
                 model=self.model,
-                temperature=self.temperature,
-                max_tokens=self.max_tokens,
                 api_key=Settings.XAI_API_KEY,
-                base_url="https://api.x.ai/v1"  # xAI API endpoint
+                base_url="https://api.x.ai/v1",  # xAI API endpoint
+                **base_kwargs
             )
 
         else:
             # Default to OpenAI
             return ChatOpenAI(
                 model=self.model,
-                temperature=self.temperature,
-                max_tokens=self.max_tokens,
-                api_key=Settings.OPENAI_API_KEY
+                api_key=Settings.OPENAI_API_KEY,
+                **base_kwargs
             )
 
-    def _call_openai(self, system_prompt: str, user_prompt: str) -> str:
+    def _call_openai(self, system_prompt: str, user_prompt: str) -> Tuple[str, Dict[str, Any]]:
         """
         Make a call to AI provider via LangChain
 
@@ -100,9 +118,17 @@ class AIService:
             user_prompt: User message
 
         Returns:
-            Generated text response
+            Tuple of (response_content, usage_metadata) where usage_metadata contains:
+            - duration_seconds: Time taken for the API call
+            - input_tokens: Number of input/prompt tokens
+            - output_tokens: Number of output/completion tokens
+            - cost_usd: Calculated cost in USD
+            - model: Model used for the generation
         """
         try:
+            # Start timing
+            start_time = time.time()
+
             # Create messages using LangChain message types
             messages = [
                 SystemMessage(content=system_prompt),
@@ -115,10 +141,53 @@ class AIService:
             # - Grok: uses xAI API format
             response = self.llm.invoke(messages)
 
-            return response.content
+            # Calculate duration
+            duration_seconds = time.time() - start_time
+
+            # Extract token usage from response
+            # LangChain stores usage info in response_metadata
+            input_tokens = 0
+            output_tokens = 0
+
+            if hasattr(response, 'response_metadata') and response.response_metadata:
+                metadata = response.response_metadata
+
+                # OpenAI format
+                if 'token_usage' in metadata:
+                    usage = metadata['token_usage']
+                    input_tokens = usage.get('prompt_tokens', 0)
+                    output_tokens = usage.get('completion_tokens', 0)
+
+                # Anthropic format
+                elif 'usage' in metadata:
+                    usage = metadata['usage']
+                    input_tokens = usage.get('input_tokens', 0)
+                    output_tokens = usage.get('output_tokens', 0)
+
+            # Calculate cost
+            cost_usd = calculate_cost(self.model, input_tokens, output_tokens)
+
+            # Build usage metadata
+            usage_metadata = {
+                'duration_seconds': duration_seconds,
+                'input_tokens': input_tokens,
+                'output_tokens': output_tokens,
+                'cost_usd': cost_usd,
+                'model': self.model
+            }
+
+            return response.content, usage_metadata
 
         except Exception as e:
-            return f"Error generating content: {str(e)}"
+            # Return error with empty metadata
+            error_metadata = {
+                'duration_seconds': 0.0,
+                'input_tokens': 0,
+                'output_tokens': 0,
+                'cost_usd': 0.0,
+                'model': self.model
+            }
+            return f"Error generating content: {str(e)}", error_metadata
 
     def analyze_image_with_vision(self, image_path: str, prompt: str, system_context: Optional[str] = None) -> str:
         """

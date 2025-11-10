@@ -2,9 +2,11 @@ import streamlit as st
 from config.database import get_db
 from database.models import BrainstormIdea, StageSummary, Project, IdeaCategorization, GeneratedContent
 from services.ai_service import AIService
+from config.stage_params import IDEATE_STAGE_PARAMS
 from datetime import datetime, timezone
 from utils.time_utils import format_local_time
 from utils.model_badge import display_model_badge
+from utils.usage_badge import display_usage_badge, inject_usage_badge_css
 
 IDEATE_METHODS = {
     "brainstorming": {"name": "Brainstorming", "icon": "🧠"},
@@ -13,8 +15,11 @@ IDEATE_METHODS = {
 }
 
 def render_ideate_page(project):
+    # Inject CSS for usage badges
+    inject_usage_badge_css()
+
     st.markdown('<div style="margin-top: 2rem;"></div>', unsafe_allow_html=True)
-    
+
     st.markdown('<div class="cards-grid">', unsafe_allow_html=True)
     cols = st.columns(3)
     
@@ -73,8 +78,17 @@ def open_brainstorming_dialog(project):
             if existing_seeds:
                 latest_seed = max(existing_seeds, key=lambda x: x.created_at)
 
-                # Show model badge
-                display_model_badge(latest_seed.model_used)
+                # Show model badge and usage metrics
+                col1, col2 = st.columns([1, 2])
+                with col1:
+                    display_model_badge(latest_seed.model_used)
+                with col2:
+                    display_usage_badge(
+                        duration_seconds=latest_seed.duration_seconds,
+                        cost_usd=latest_seed.cost_usd,
+                        input_tokens=latest_seed.input_tokens,
+                        output_tokens=latest_seed.output_tokens
+                    )
 
                 # Show timestamp
                 st.markdown(f"<small style='color: gray;'>Last updated: {format_local_time(latest_seed.created_at)}</small>", unsafe_allow_html=True)
@@ -207,7 +221,12 @@ def generate_seed_ideas(project_id):
 
         with st.spinner("🤖 Generating seed ideas... This may take a moment."):
             try:
-                ai_service = AIService(model=project.preferred_model)
+                ai_service = AIService(
+                    model=project.preferred_model,
+                    temperature=IDEATE_STAGE_PARAMS["temperature"],
+                    top_p=IDEATE_STAGE_PARAMS["top_p"],
+                    max_tokens=IDEATE_STAGE_PARAMS["max_tokens"]
+                )
             except ValueError as e:
                 if "API_KEY not set" in str(e):
                     st.error(f"❌ API key missing: {str(e)}")
@@ -224,15 +243,17 @@ def generate_seed_ideas(project_id):
                 problem_define=problem_define
             )
 
-            result = ai_service._call_openai(system_prompt, user_prompt)
+            result, usage_metadata = ai_service._call_openai(system_prompt, user_prompt)
 
-            if result:
-                # Parse and save ideas with model info
-                parse_and_save_seed_ideas(project_id, result, project.preferred_model, db)
+            # Check if result is an error message
+            if result and not result.startswith("Error generating content"):
+                # Parse and save ideas with model info and usage tracking
+                parse_and_save_seed_ideas(project_id, result, project.preferred_model, usage_metadata, db)
                 st.success("✅ Seed ideas generated!")
                 return True
             else:
-                st.error("Failed to generate seed ideas. Please try again.")
+                error_msg = result if result.startswith("Error") else "Failed to generate seed ideas"
+                st.error(f"❌ {error_msg}")
                 return False
 
     except Exception as e:
@@ -241,8 +262,8 @@ def generate_seed_ideas(project_id):
     finally:
         db.close()
 
-def parse_and_save_seed_ideas(project_id, ai_result, model_used, db):
-    """Parse AI result and save to database with model tracking"""
+def parse_and_save_seed_ideas(project_id, ai_result, model_used, usage_metadata, db):
+    """Parse AI result and save to database with model tracking and usage metrics"""
     # This is simplified - implement proper parsing
     lines = ai_result.split('\n')
     order = 0
@@ -263,6 +284,10 @@ def parse_and_save_seed_ideas(project_id, ai_result, model_used, db):
                     idea_type=current_type,
                     idea_text=line.lstrip('-* '),
                     model_used=model_used,
+                    duration_seconds=usage_metadata.get('duration_seconds'),
+                    input_tokens=usage_metadata.get('input_tokens'),
+                    output_tokens=usage_metadata.get('output_tokens'),
+                    cost_usd=usage_metadata.get('cost_usd'),
                     order_index=order
                 )
                 db.add(idea)
@@ -287,7 +312,12 @@ def expand_idea(project_id, user_idea):
         problem_summary = latest_summary.summary_text if latest_summary else f"{project.goal}"
 
         with st.spinner("🔍 Expanding your idea..."):
-            ai_service = AIService(model=project.preferred_model)
+            ai_service = AIService(
+                model=project.preferred_model,
+                temperature=IDEATE_STAGE_PARAMS["temperature"],
+                top_p=IDEATE_STAGE_PARAMS["top_p"],
+                max_tokens=IDEATE_STAGE_PARAMS["max_tokens"]
+            )
 
             system_prompt = BRAINSTORM_EXPAND_IDEA_PROMPT.format(
                 project_name=project.name,
@@ -296,7 +326,7 @@ def expand_idea(project_id, user_idea):
                 user_idea=user_idea
             )
 
-            expansion = ai_service._call_openai(system_prompt, f"Expand this idea: {user_idea}")
+            expansion, usage_metadata = ai_service._call_openai(system_prompt, f"Expand this idea: {user_idea}")
 
             if expansion:
                 # Save parent idea
@@ -309,13 +339,17 @@ def expand_idea(project_id, user_idea):
                 db.add(parent)
                 db.flush()
 
-                # Save expansion with model info
+                # Save expansion with model info and usage tracking
                 expanded = BrainstormIdea(
                     project_id=project_id,
                     idea_type='expansion',
                     idea_text=expansion,
                     parent_id=parent.id,
-                    model_used=project.preferred_model
+                    model_used=project.preferred_model,
+                    duration_seconds=usage_metadata.get('duration_seconds'),
+                    input_tokens=usage_metadata.get('input_tokens'),
+                    output_tokens=usage_metadata.get('output_tokens'),
+                    cost_usd=usage_metadata.get('cost_usd')
                 )
                 db.add(expanded)
                 db.commit()
@@ -350,7 +384,12 @@ def categorize_ideas(project_id):
             if idea.idea_type in ('user_input', 'expansion'):
                 ideas_text += f"- {idea.idea_text}\n"
 
-        ai_service = AIService(model=project.preferred_model)
+        ai_service = AIService(
+            model=project.preferred_model,
+            temperature=IDEATE_STAGE_PARAMS["temperature"],
+            top_p=IDEATE_STAGE_PARAMS["top_p"],
+            max_tokens=IDEATE_STAGE_PARAMS["max_tokens"]
+        )
 
         system_prompt = BRAINSTORM_CATEGORIZE_IDEAS_PROMPT.format(
             project_name=project.name,
@@ -358,7 +397,7 @@ def categorize_ideas(project_id):
             all_ideas=ideas_text
         )
 
-        categorization_result = ai_service._call_openai(system_prompt, "Categorize all ideas into themes")
+        categorization_result, usage_metadata = ai_service._call_openai(system_prompt, "Categorize all ideas into themes")
 
         if categorization_result:
             # Check if categorization already exists
@@ -448,7 +487,12 @@ def generate_ideate_summary(project_id):
 
         # Generate summary using AI
         from prompts.summary import IDEATE_STAGE_SUMMARY_PROMPT
-        ai_service = AIService(model=project.preferred_model)
+        ai_service = AIService(
+            model=project.preferred_model,
+            temperature=IDEATE_STAGE_PARAMS["temperature"],
+            top_p=IDEATE_STAGE_PARAMS["top_p"],
+            max_tokens=IDEATE_STAGE_PARAMS["max_tokens"]
+        )
 
         system_prompt = IDEATE_STAGE_SUMMARY_PROMPT.format(
             project_name=project.name,
@@ -459,7 +503,7 @@ def generate_ideate_summary(project_id):
 
         user_prompt = "Synthesize the ideation results into a concise summary."
 
-        summary_text = ai_service._call_openai(system_prompt, user_prompt)
+        summary_text, usage_metadata = ai_service._call_openai(system_prompt, user_prompt)
 
         if summary_text:
             # Check if summary already exists for this project's ideate stage

@@ -207,7 +207,7 @@ def analyze_and_save_sketch(prototype_page, project, ideate_summary, uploaded_fi
             ideate_summary=ideate_text
         )
 
-        suggestions = ai_service._call_openai("You are a UX expert providing constructive feedback.", suggestions_prompt)
+        suggestions, usage_metadata = ai_service._call_openai("You are a UX expert providing constructive feedback.", suggestions_prompt)
 
         # Update sketch with analysis
         sketch.ai_analysis = analysis

@@ -5,6 +5,7 @@ from services.ai_service import AIService
 from datetime import datetime
 from utils.time_utils import format_local_time
 from utils.model_badge import display_model_badge
+from utils.usage_badge import display_usage_badge, inject_usage_badge_css
 
 ANALYSIS_METHODS = {
     "empathy_map": {"name": "Empathy Map", "icon": "🧩"},
@@ -66,7 +67,7 @@ def generate_stage_summary(project_id):
             define_analyses=analyses_text
         )
 
-        summary_text = ai_service._call_openai(system_prompt, user_prompt)
+        summary_text, usage_metadata = ai_service._call_openai(system_prompt, user_prompt)
 
         if summary_text:
             # Get current version number
@@ -92,6 +93,9 @@ def generate_stage_summary(project_id):
         db.close()
 
 def render_define_page(project):
+    # Inject CSS for usage badges
+    inject_usage_badge_css()
+
     db = get_db()
     generated_content = db.query(GeneratedContent).filter(GeneratedContent.project_id == project.id).all()
     research_data = db.query(ResearchData).filter(ResearchData.project_id == project.id).all()
@@ -157,8 +161,17 @@ def open_analysis_dialog(project, method_key, method_name, research_data):
             display_number = total_count - idx + 1
 
             with st.expander(f"📄 Analysis #{display_number} - Generated on {created_time}", expanded=(idx == 1)):
-                # Display model badge
-                display_model_badge(content.model_used)
+                # Display model badge and usage metrics
+                col1, col2 = st.columns([1, 2])
+                with col1:
+                    display_model_badge(content.model_used)
+                with col2:
+                    display_usage_badge(
+                        duration_seconds=content.duration_seconds,
+                        cost_usd=content.cost_usd,
+                        input_tokens=content.input_tokens,
+                        output_tokens=content.output_tokens
+                    )
                 st.divider()
 
                 # Display content
@@ -265,18 +278,22 @@ def generate_analysis(project_id, content_type, content_name, research_data):
             """
 
             # Call AI service
-            generated_content = ai_service._call_openai(ANALYSIS_PROMPT, user_prompt)
+            generated_content, usage_metadata = ai_service._call_openai(ANALYSIS_PROMPT, user_prompt)
 
             if not generated_content:
                 st.error("Failed to generate content. Please try again.")
                 return False
 
-            # Save to database with model info
+            # Save to database with model info and usage tracking
             new_content = GeneratedContent(
                 project_id=project_id,
                 content_type=content_type,
                 content=generated_content,
-                model_used=project.preferred_model
+                model_used=project.preferred_model,
+                duration_seconds=usage_metadata['duration_seconds'],
+                input_tokens=usage_metadata['input_tokens'],
+                output_tokens=usage_metadata['output_tokens'],
+                cost_usd=usage_metadata['cost_usd']
             )
             db.add(new_content)
             db.commit()
