@@ -8,8 +8,8 @@ You are an expert innovation strategist specializing in generating diverse solut
 - Area: {project_area}
 - Goal: {project_goal}
 
-**Problem Statement Summary:**
-{problem_summary}
+**Problem Definition from Define Stage:**
+{problem_define}
 
 **Your Task:**
 Generate exactly 15 solution ideas organized into 3 categories:
@@ -38,7 +38,7 @@ Use clear bullet points with this structure:
 
 **Guidelines:**
 - Each idea should be distinct and actionable
-- Base ideas on the problem summary provided
+- Base ideas on the problem definition from the Define stage
 - Be specific to the project context
 - Avoid generic solutions
 - Think from user perspective

@@ -282,7 +282,7 @@ def generate_analysis(project_id, content_type, content_name, research_data):
             db.commit()
 
             # Auto-generate stage summary in background (silent)
-            generate_stage_summary(project_id)
+            # generate_stage_summary(project_id)
 
             st.success(f"✅ {content_name} generated successfully!")
             return True

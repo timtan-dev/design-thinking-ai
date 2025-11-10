@@ -1,6 +1,6 @@
 import streamlit as st
 from config.database import get_db
-from database.models import BrainstormIdea, StageSummary, Project, IdeaCategorization
+from database.models import BrainstormIdea, StageSummary, Project, IdeaCategorization, GeneratedContent
 from services.ai_service import AIService
 from datetime import datetime, timezone
 from utils.time_utils import format_local_time
@@ -39,11 +39,14 @@ def open_brainstorming_dialog(project):
 
     db = get_db()
 
-    # Check if Define stage summary exists
-    define_summary = db.query(StageSummary).filter(
-        StageSummary.project_id == project.id,
-        StageSummary.stage == "define"
-    ).order_by(StageSummary.created_at.desc()).first()
+    # Check if Define stage has generated content
+    define_content = db.query(GeneratedContent).filter(
+        GeneratedContent.project_id == project.id,
+        GeneratedContent.content_type.in_([
+            'empathy_map', 'persona', 'journey_map',
+            'affinity_map', 'storytelling', 'stakeholder_map'
+        ])
+    ).all()
 
     # Check if seed ideas already generated
     existing_seeds = db.query(BrainstormIdea).filter(
@@ -57,7 +60,7 @@ def open_brainstorming_dialog(project):
     # Tab 1: Pre-brainstorm Seed Ideas
     with tab1:
         # Check if Define stage is completed
-        if not define_summary:
+        if not define_content:
             st.warning("⚠️ Please complete the Define stage first!")
             st.info("""
             **To generate seed ideas, you need to:**
@@ -65,41 +68,37 @@ def open_brainstorming_dialog(project):
             2. Generate at least one analysis (Empathy Map, Persona, Journey Map, etc.)
             """)
         else:
-            # Show timestamp and regenerate button if seeds exist
+            # Show existing seed ideas or generate button
             if existing_seeds:
                 latest_seed = max(existing_seeds, key=lambda x: x.created_at)
 
-                # Check if Define was updated after seeds were generated
-                define_updated_after_seeds = define_summary.created_at > latest_seed.created_at
-
-                # Create two columns for timestamp and button
+                # Show timestamp
                 st.markdown(f"<small style='color: gray;'>Last updated: {format_local_time(latest_seed.created_at)}</small>", unsafe_allow_html=True)
-                if define_updated_after_seeds:
-                    st.markdown(f"<small style='color: orange;'>⚠️ Define updated: {format_local_time(define_summary.created_at)}</small>", unsafe_allow_html=True)
 
                 # Display existing seed ideas
                 st.markdown("")
                 display_seed_ideas(existing_seeds)
 
-                # Display regenerate button if define update
+                # Display regenerate button
                 st.markdown("")
-                if define_updated_after_seeds:
-                    if st.button("🔄 Regenerate Seed Ideas", type="primary", use_container_width=True):
-                        # Delete existing seeds before regenerating
-                        db.query(BrainstormIdea).filter(
-                            BrainstormIdea.project_id == project.id,
-                            BrainstormIdea.idea_type.like('seed_%')
-                        ).delete()
-                        db.commit()
-                        generate_seed_ideas(project.id)
-                        db.close()
+                if st.button("🔄 Regenerate Seed Ideas", type="primary", use_container_width=True):
+                    # Delete existing seeds before regenerating
+                    db.query(BrainstormIdea).filter(
+                        BrainstormIdea.project_id == project.id,
+                        BrainstormIdea.idea_type.like('seed_%')
+                    ).delete()
+                    db.commit()
+                    success = generate_seed_ideas(project.id)
+                    db.close()
+                    if success:
                         st.rerun()
             else:
                 # No seeds yet - show generate button
                 if st.button("✨ Generate Seed Ideas", type="primary", use_container_width=True):
-                    generate_seed_ideas(project.id)
+                    success = generate_seed_ideas(project.id)
                     db.close()
-                    st.rerun()
+                    if success:
+                        st.rerun()
 
     # Tab 2: Real-time Idea Expansion
     with tab2:
@@ -166,43 +165,73 @@ def display_seed_ideas(seeds):
         st.markdown(f"- {idea.idea_text}")
 
 def generate_seed_ideas(project_id):
-    """Generate 15 seed ideas (5 practical, 5 bold, 5 wild)"""
+    """
+    Generate 15 seed ideas (5 practical, 5 bold, 5 wild)
+
+    Returns:
+        bool: True if successful, False if failed
+    """
     from prompts.ideate.brainstorming import BRAINSTORM_SEED_IDEAS_PROMPT
-    
+
     db = get_db()
     try:
         project = db.query(Project).filter(Project.id == project_id).first()
-        
-        # Get latest Define stage summary
-        latest_summary = db.query(StageSummary).filter(
-            StageSummary.project_id == project_id,
-            StageSummary.stage == "define"
-        ).order_by(StageSummary.created_at.desc()).first()
-        
-        problem_summary = latest_summary.summary_text if latest_summary else f"Solve problems in {project.area} to achieve {project.goal}"
-        
+        if not project:
+            st.error("Project not found!")
+            return False
+
+        # Get all latest Define stage content for each content type
+        content_types = ['empathy_map', 'persona', 'journey_map', 'affinity_map', 'storytelling', 'stakeholder_map']
+        problem_define = ""
+
+        for content_type in content_types:
+            latest_content = db.query(GeneratedContent).filter(
+                GeneratedContent.project_id == project_id,
+                GeneratedContent.content_type == content_type
+            ).order_by(GeneratedContent.created_at.desc()).first()
+
+            if latest_content:
+                # Add content type header
+                content_name = content_type.replace('_', ' ').title()
+                problem_define += f"\n**{content_name}:**\n{latest_content.content}\n\n"
+
+        # Fallback if no Define content (shouldn't happen due to check in dialog)
+        if not problem_define.strip():
+            problem_define = f"Solve problems in {project.area} to achieve {project.goal}"
+
         with st.spinner("🤖 Generating seed ideas... This may take a moment."):
-            ai_service = AIService(model=project.preferred_model)
-            
-            user_prompt = f"Generate 15 diverse solution ideas for the project."
-            
+            try:
+                ai_service = AIService(model=project.preferred_model)
+            except ValueError as e:
+                if "API_KEY not set" in str(e):
+                    st.error(f"❌ API key missing: {str(e)}")
+                else:
+                    st.error(f"Configuration error: {str(e)}")
+                return False
+
+            user_prompt = f"Generate 15 diverse solution ideas for the project based on the problem definition."
+
             system_prompt = BRAINSTORM_SEED_IDEAS_PROMPT.format(
                 project_name=project.name,
                 project_area=project.area,
                 project_goal=project.goal,
-                problem_summary=problem_summary
+                problem_define=problem_define
             )
-            
+
             result = ai_service._call_openai(system_prompt, user_prompt)
-            
+
             if result:
-                # Parse and save ideas (simplified - you'd parse the result properly)
-                # For now, save as single text per category
+                # Parse and save ideas
                 parse_and_save_seed_ideas(project_id, result, db)
                 st.success("✅ Seed ideas generated!")
-            
+                return True
+            else:
+                st.error("Failed to generate seed ideas. Please try again.")
+                return False
+
     except Exception as e:
         st.error(f"Error: {str(e)}")
+        return False
     finally:
         db.close()
 
