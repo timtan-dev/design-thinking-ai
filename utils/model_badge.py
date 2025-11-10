@@ -7,17 +7,10 @@ import streamlit as st
 
 # Model display names
 MODEL_DISPLAY_NAMES = {
-    "gpt-4o": "GPT-4o",
-    "gpt-4o-mini": "GPT-4o Mini",
-    "o1": "o1",
-    "o1-mini": "o1 Mini",
     "gpt-5": "GPT-5",
     "gpt-4.1": "GPT-4.1",
-    "claude-sonnet-4.5-20250514": "Claude Sonnet 4.5",
-    "claude-sonnet-4-20250514": "Claude Sonnet 4",
-    "claude-opus-4-20250514": "Claude Opus 4",
+    "claude-sonnet-4-5-20250929": "Claude Sonnet 4.5",
     "grok-4": "Grok 4",
-    "grok-beta": "Grok Beta",
 }
 
 def display_model_badge(model_name: str):

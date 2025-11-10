@@ -44,9 +44,7 @@ def render_project_header(project):
         available_models = {
             "gpt-5": "GPT-5",
             "gpt-4.1": "GPT-4.1",
-            "o1": "o1",
-            "o1-mini": "o1 Mini",
-            "claude-sonnet-4.5-20250514": "Claude Sonnet 4.5",
+            "claude-sonnet-4-5-20250929": "Claude Sonnet 4.5",
             "grok-4": "Grok 4",
         }
 
