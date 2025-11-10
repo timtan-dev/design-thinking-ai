@@ -124,6 +124,7 @@ class BrainstormIdea(Base):
     idea_text = Column(Text, nullable=False)
     parent_id = Column(Integer, ForeignKey("brainstorm_ideas.id"), nullable=True)  # For expansions
     order_index = Column(Integer, default=0)  # For maintaining order
+    model_used = Column(String(100), nullable=True)  # AI model used to generate this idea
     created_at = Column(DateTime, default=datetime.utcnow)
 
     # Relationships

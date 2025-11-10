@@ -4,6 +4,7 @@ from database.models import BrainstormIdea, StageSummary, Project, IdeaCategoriz
 from services.ai_service import AIService
 from datetime import datetime, timezone
 from utils.time_utils import format_local_time
+from utils.model_badge import display_model_badge
 
 IDEATE_METHODS = {
     "brainstorming": {"name": "Brainstorming", "icon": "🧠"},
@@ -71,6 +72,9 @@ def open_brainstorming_dialog(project):
             # Show existing seed ideas or generate button
             if existing_seeds:
                 latest_seed = max(existing_seeds, key=lambda x: x.created_at)
+
+                # Show model badge
+                display_model_badge(latest_seed.model_used)
 
                 # Show timestamp
                 st.markdown(f"<small style='color: gray;'>Last updated: {format_local_time(latest_seed.created_at)}</small>", unsafe_allow_html=True)
@@ -221,8 +225,8 @@ def generate_seed_ideas(project_id):
             result = ai_service._call_openai(system_prompt, user_prompt)
 
             if result:
-                # Parse and save ideas
-                parse_and_save_seed_ideas(project_id, result, db)
+                # Parse and save ideas with model info
+                parse_and_save_seed_ideas(project_id, result, project.preferred_model, db)
                 st.success("✅ Seed ideas generated!")
                 return True
             else:
@@ -235,13 +239,13 @@ def generate_seed_ideas(project_id):
     finally:
         db.close()
 
-def parse_and_save_seed_ideas(project_id, ai_result, db):
-    """Parse AI result and save to database"""
+def parse_and_save_seed_ideas(project_id, ai_result, model_used, db):
+    """Parse AI result and save to database with model tracking"""
     # This is simplified - implement proper parsing
     lines = ai_result.split('\n')
     order = 0
     current_type = None
-    
+
     for line in lines:
         line = line.strip()
         if 'PRACTICAL' in line.upper():
@@ -256,11 +260,12 @@ def parse_and_save_seed_ideas(project_id, ai_result, db):
                     project_id=project_id,
                     idea_type=current_type,
                     idea_text=line.lstrip('-* '),
+                    model_used=model_used,
                     order_index=order
                 )
                 db.add(idea)
                 order += 1
-    
+
     db.commit()
 
 def expand_idea(project_id, user_idea):
@@ -296,17 +301,19 @@ def expand_idea(project_id, user_idea):
                 parent = BrainstormIdea(
                     project_id=project_id,
                     idea_type='user_input',
-                    idea_text=user_idea
+                    idea_text=user_idea,
+                    model_used=None  # User input, no model used
                 )
                 db.add(parent)
                 db.flush()
 
-                # Save expansion
+                # Save expansion with model info
                 expanded = BrainstormIdea(
                     project_id=project_id,
                     idea_type='expansion',
                     idea_text=expansion,
-                    parent_id=parent.id
+                    parent_id=parent.id,
+                    model_used=project.preferred_model
                 )
                 db.add(expanded)
                 db.commit()
