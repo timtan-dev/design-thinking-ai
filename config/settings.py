@@ -66,7 +66,7 @@ class Settings:
     # OpenAI
     OPENAI_MODEL = os.getenv('OPENAI_MODEL', 'gpt-4.1')
     OPENAI_TEMPERATURE = float(os.getenv('OPENAI_TEMPERATURE', '0.7'))
-    OPENAI_MAX_TOKENS = int(os.getenv('OPENAI_MAX_TOKENS', '2000'))
+    OPENAI_MAX_TOKENS = int(os.getenv('OPENAI_MAX_TOKENS', '16000'))  # Increased for comprehensive outputs like affinity mapping
 
     @classmethod
     def ensure_directories(cls):
