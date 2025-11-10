@@ -46,6 +46,8 @@ def render_project_header(project):
             "gpt-4.1": "GPT-4.1",
             "o1": "o1",
             "o1-mini": "o1 Mini",
+            "claude-sonnet-4.5-20250514": "Claude Sonnet 4.5",
+            "grok-4": "Grok 4",
         }
 
         # Get current model or default

@@ -40,6 +40,8 @@ class Settings:
         return os.getenv(key, default)
 
     OPENAI_API_KEY = _get_secret.__func__(None, 'OPENAI_API_KEY', '')
+    ANTHROPIC_API_KEY = _get_secret.__func__(None, 'ANTHROPIC_API_KEY', '')
+    XAI_API_KEY = _get_secret.__func__(None, 'XAI_API_KEY', '')  # For Grok models
 
     # Database
     DATABASE_URL = os.getenv('DATABASE_URL', 'sqlite:///./design_thinking.db')

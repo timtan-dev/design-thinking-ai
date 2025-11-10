@@ -1,33 +1,99 @@
 """
-AI Service - OpenAI API Integration
-Wrapper for all AI-powered generation tasks
+AI Service - Multi-Provider AI Integration
+Wrapper for all AI-powered generation tasks using LangChain
+Supports: OpenAI (GPT, o1), Anthropic (Claude), xAI (Grok)
 """
 
 from openai import OpenAI
 from config.settings import Settings
-from typing import Dict, Any, Optional
+from typing import Dict, Any, Optional, Union
 from datetime import datetime
 import json
 import base64
 
+# LangChain imports
+from langchain_openai import ChatOpenAI
+from langchain_anthropic import ChatAnthropic
+from langchain_core.messages import HumanMessage, SystemMessage, BaseMessage
+from langchain_core.language_models.chat_models import BaseChatModel
+
 class AIService:
-    """AI service for generating content using OpenAI API"""
+    """AI service for generating content using multiple AI providers via LangChain"""
 
     def __init__(self, model: Optional[str] = None):
         """
-        Initialize OpenAI client
+        Initialize AI service with LangChain multi-provider support
 
         Args:
             model: Optional model override. If not provided, uses Settings.OPENAI_MODEL
         """
-        self.client = OpenAI(api_key=Settings.OPENAI_API_KEY)
         self.model = model if model else Settings.OPENAI_MODEL
         self.temperature = Settings.OPENAI_TEMPERATURE
         self.max_tokens = Settings.OPENAI_MAX_TOKENS
 
+        # Initialize the appropriate LangChain chat model based on model name
+        self.llm = self._initialize_llm()
+
+        # Keep OpenAI client for image generation (DALL-E)
+        self.client = OpenAI(api_key=Settings.OPENAI_API_KEY)
+
+    def _initialize_llm(self) -> BaseChatModel:
+        """
+        Initialize the appropriate LangChain chat model based on model name
+
+        Returns:
+            LangChain chat model instance
+        """
+        # OpenAI models (GPT-4, GPT-5, o1, etc.)
+        if self.model.startswith(('gpt', 'o1')):
+            return ChatOpenAI(
+                model=self.model,
+                temperature=self.temperature,
+                max_tokens=self.max_tokens,
+                api_key=Settings.OPENAI_API_KEY
+            )
+
+        # Anthropic models (Claude)
+        elif self.model.startswith('claude'):
+            if not Settings.ANTHROPIC_API_KEY:
+                raise ValueError("ANTHROPIC_API_KEY not set in environment variables")
+            return ChatAnthropic(
+                model=self.model,
+                temperature=self.temperature,
+                max_tokens=self.max_tokens,
+                api_key=Settings.ANTHROPIC_API_KEY
+            )
+
+        # xAI models (Grok) - Using OpenAI-compatible API
+        elif self.model.startswith('grok'):
+            if not Settings.XAI_API_KEY:
+                raise ValueError("XAI_API_KEY not set in environment variables")
+            # xAI uses OpenAI-compatible API
+            return ChatOpenAI(
+                model=self.model,
+                temperature=self.temperature,
+                max_tokens=self.max_tokens,
+                api_key=Settings.XAI_API_KEY,
+                base_url="https://api.x.ai/v1"  # xAI API endpoint
+            )
+
+        else:
+            # Default to OpenAI
+            return ChatOpenAI(
+                model=self.model,
+                temperature=self.temperature,
+                max_tokens=self.max_tokens,
+                api_key=Settings.OPENAI_API_KEY
+            )
+
     def _call_openai(self, system_prompt: str, user_prompt: str) -> str:
         """
-        Make a call to OpenAI API
+        Make a call to AI provider via LangChain
+
+        LangChain automatically handles:
+        - o1 model parameter differences (max_completion_tokens, no temperature)
+        - Provider-specific API formats
+        - System message compatibility
 
         Args:
             system_prompt: System instruction
@@ -37,37 +103,20 @@ class AIService:
             Generated text response
         """
         try:
-            # o1 models have different parameter requirements
-            is_o1_model = self.model.startswith('o1')
+            # Create messages using LangChain message types
+            messages = [
+                SystemMessage(content=system_prompt),
+                HumanMessage(content=user_prompt)
+            ]
 
-            if is_o1_model:
-                # o1 models don't support system messages or temperature
-                # Combine system and user prompts into a single user message
-                messages = [
-                    {"role": "user", "content": f"{system_prompt}\n\n{user_prompt}"}
-                ]
+            # LangChain automatically handles model-specific requirements:
+            # - o1 models: converts system messages, uses max_completion_tokens
+            # - Claude: uses Anthropic API format
+            # - Grok: uses xAI API format
+            response = self.llm.invoke(messages)
 
-                # o1 uses max_completion_tokens instead of max_tokens
-                response = self.client.chat.completions.create(
-                    model=self.model,
-                    messages=messages,
-                    max_completion_tokens=self.max_tokens
-                )
-            else:
-                # GPT-4, GPT-5, and other standard models
-                messages = [
-                    {"role": "system", "content": system_prompt},
-                    {"role": "user", "content": user_prompt}
-                ]
+            return response.content
 
-                response = self.client.chat.completions.create(
-                    model=self.model,
-                    messages=messages,
-                    temperature=self.temperature,
-                    max_tokens=self.max_tokens
-                )
-
-            return response.choices[0].message.content
         except Exception as e:
             return f"Error generating content: {str(e)}"
 
