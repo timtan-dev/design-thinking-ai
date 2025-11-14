@@ -6,6 +6,8 @@ from services.ai_service import AIService
 from config.stage_params import EMPATHISE_STAGE_PARAMS
 from docx import Document
 import io
+import pdfplumber
+from PyPDF2 import PdfReader
 
 RESEARCH_METHODS = {
     "interview": {"name": "Interview", "icon": "🎤"},
@@ -13,7 +15,8 @@ RESEARCH_METHODS = {
     "ethnography": {"name": "Ethnography", "icon": "👣"},
     "focus_group": {"name": "Focus Group", "icon": "🧍"},
     "observation": {"name": "Observation", "icon": "📸"},
-    "diary_study": {"name": "Diary Study", "icon": "📔"}
+    "diary_study": {"name": "Diary Study", "icon": "📔"},
+    "other": {"name": "Other", "icon": "📁"}
 }
 
 def render_empathise_page(project):
@@ -43,7 +46,12 @@ def render_empathise_page(project):
 
             # Small caption for status
             if is_uploaded:
-                st.caption("✓ Data uploaded")
+                # Show file count for methods with uploaded data
+                file_count = sum(1 for data in uploaded_data if data.method_type == method_key)
+                if file_count > 1:
+                    st.caption(f"✓ {file_count} files uploaded")
+                else:
+                    st.caption("✓ Data uploaded")
 
     st.markdown("</div>", unsafe_allow_html=True)
 
@@ -53,25 +61,52 @@ def open_method_dialog(project, method_key, method_name):
     """Dialog window for uploading data or downloading a template"""
     st.markdown(f"### {method_name}")
 
-    # File uploader
-    uploaded_file = st.file_uploader(
-        label="",
-        type=["txt", "pdf", "docx", "csv"],
-        key=f"upload_dialog_{method_key}"
-    )
+    # For "Other" method, support multiple file uploads without template generation
+    if method_key == "other":
+        st.info("📁 Upload multiple case study files, reports, or other documents.")
 
-    # Show save button if file is uploaded
-    if uploaded_file:
-        if st.button("💾 Save", use_container_width=True):
-            save_research_data(project.id, method_key, uploaded_file)
-            st.success(f"{method_name} data uploaded successfully!")
-            st.rerun()
+        # Multiple file uploader
+        uploaded_files = st.file_uploader(
+            label="Select multiple files",
+            type=["txt", "pdf", "docx", "csv"],
+            key=f"upload_dialog_{method_key}",
+            accept_multiple_files=True
+        )
 
-    st.divider()
+        # Show save button if files are uploaded
+        if uploaded_files:
+            st.caption(f"📊 {len(uploaded_files)} file(s) selected")
+            if st.button("💾 Save All", use_container_width=True):
+                success_count = 0
+                for uploaded_file in uploaded_files:
+                    if save_research_data(project.id, method_key, uploaded_file):
+                        success_count += 1
 
-    # Template generation section
-    st.markdown("### 📝 Generate AI Template")
-    generate_template(method_key, method_name, project)
+                if success_count == len(uploaded_files):
+                    st.success(f"✅ All {success_count} file(s) uploaded successfully!")
+                else:
+                    st.warning(f"⚠️ {success_count}/{len(uploaded_files)} file(s) uploaded successfully")
+                st.rerun()
+    else:
+        # Original single file upload for other methods
+        uploaded_file = st.file_uploader(
+            label="",
+            type=["txt", "pdf", "docx", "csv"],
+            key=f"upload_dialog_{method_key}"
+        )
+
+        # Show save button if file is uploaded
+        if uploaded_file:
+            if st.button("💾 Save", use_container_width=True):
+                if save_research_data(project.id, method_key, uploaded_file):
+                    st.success(f"{method_name} data uploaded successfully!")
+                    st.rerun()
+
+        st.divider()
+
+        # Template generation section
+        st.markdown("### 📝 Generate AI Template")
+        generate_template(method_key, method_name, project)
 
 
 
@@ -236,8 +271,65 @@ def show_generated_template(method_name, template_content, method_type, project)
             )
 
 
+def extract_pdf_text(uploaded_file):
+    """
+    Extract text from PDF using pdfplumber with PyPDF2 fallback
+
+    Returns:
+        str: Extracted text content
+    """
+    uploaded_file.seek(0)
+
+    # Method 1: Try pdfplumber (best for tables and complex layouts)
+    try:
+        pdf_bytes = io.BytesIO(uploaded_file.read())
+        with pdfplumber.open(pdf_bytes) as pdf:
+            text_content = []
+            for page in pdf.pages:
+                page_text = page.extract_text()
+                if page_text:
+                    text_content.append(page_text)
+
+                # Also extract tables if present
+                tables = page.extract_tables()
+                for table in tables:
+                    # Convert table to text format
+                    table_text = '\n'.join(['\t'.join([str(cell) if cell else '' for cell in row]) for row in table])
+                    text_content.append(f"\n[TABLE]\n{table_text}\n[/TABLE]\n")
+
+            extracted_text = '\n\n'.join(text_content)
+            if extracted_text.strip():
+                return extracted_text
+    except Exception as e:
+        print(f"pdfplumber extraction failed: {str(e)}, trying PyPDF2...")
+
+    # Method 2: Fallback to PyPDF2
+    try:
+        uploaded_file.seek(0)
+        pdf_reader = PdfReader(io.BytesIO(uploaded_file.read()))
+        text_content = []
+        for page in pdf_reader.pages:
+            page_text = page.extract_text()
+            if page_text:
+                text_content.append(page_text)
+
+        extracted_text = '\n\n'.join(text_content)
+        if extracted_text.strip():
+            return extracted_text
+    except Exception as e:
+        print(f"PyPDF2 extraction failed: {str(e)}")
+
+    # If both methods fail, return error message
+    return "[PDF extraction failed - file may be image-based or corrupted]"
+
+
 def save_research_data(project_id, method_type, uploaded_file):
-    """Save uploaded research data and extract text content based on file type"""
+    """
+    Save uploaded research data and extract text content based on file type
+
+    Returns:
+        bool: True if successful, False if failed
+    """
     db = get_db()
     try:
         # Read file content based on file type
@@ -249,9 +341,8 @@ def save_research_data(project_id, method_type, uploaded_file):
             doc = Document(io.BytesIO(uploaded_file.read()))
             file_content = '\n'.join([paragraph.text for paragraph in doc.paragraphs])
         elif file_extension == 'pdf':
-            # For PDF, decode as text (basic extraction - can be improved later)
-            uploaded_file.seek(0)
-            file_content = uploaded_file.read().decode("utf-8", errors="ignore")
+            # Extract text from PDF using pdfplumber with PyPDF2 fallback
+            file_content = extract_pdf_text(uploaded_file)
         else:
             # For txt, csv, and other text files
             uploaded_file.seek(0)
@@ -277,9 +368,10 @@ def save_research_data(project_id, method_type, uploaded_file):
         )
         db.add(research_data)
         db.commit()
-        st.success(f"{uploaded_file.name} uploaded successfully!")
+        return True
     except Exception as e:
-        st.error(f"Error uploading file: {str(e)}")
+        st.error(f"Error uploading {uploaded_file.name}: {str(e)}")
         db.rollback()
+        return False
     finally:
         db.close()
