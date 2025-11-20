@@ -7,6 +7,10 @@ Updated as of January 2025.
 
 MODEL_PRICING = {
     # OpenAI GPT Models
+    "gpt-5.1": {
+        "input": 1.25,   # per 1M input tokens
+        "output": 10.00  # per 1M output tokens
+    },
     "gpt-5": {
         "input": 1.25,   # per 1M input tokens
         "output": 10.00  # per 1M output tokens

@@ -1,7 +1,7 @@
 """
 AI Service - Multi-Provider AI Integration
 Wrapper for all AI-powered generation tasks using LangChain
-Supports: OpenAI (GPT-4.1, GPT-5), Anthropic (Claude), xAI (Grok)
+Supports: OpenAI (GPT-4.1, GPT-5, GPT-5.1), Anthropic (Claude), xAI (Grok)
 """
 
 from openai import OpenAI
@@ -54,7 +54,7 @@ class AIService:
         Initialize the appropriate LangChain chat model based on model name
 
         Model-specific parameter handling:
-        - GPT-5: No temperature/top_p (only max_tokens)
+        - GPT-5 / GPT-5.1: No temperature/top_p (only max_tokens)
         - Claude: Only temperature (no top_p)
         - GPT-4.1: temperature + top_p
         - Grok-4: temperature + top_p
@@ -62,8 +62,8 @@ class AIService:
         Returns:
             LangChain chat model instance
         """
-        # GPT-5 - No parameters except max_tokens
-        if self.model == 'gpt-5':
+        # GPT-5 and GPT-5.1 - No parameters except max_tokens
+        if self.model in ['gpt-5', 'gpt-5.1']:
             return ChatOpenAI(
                 model=self.model,
                 api_key=Settings.OPENAI_API_KEY,
@@ -162,7 +162,7 @@ class AIService:
             ]
 
             # LangChain automatically handles model-specific requirements:
-            # - GPT-5: no temperature/top_p parameters
+            # - GPT-5 / GPT-5.1: no temperature/top_p parameters
             # - Claude: uses Anthropic API format, no top_p
             # - Grok: uses xAI API format
             response = self.llm.invoke(messages)

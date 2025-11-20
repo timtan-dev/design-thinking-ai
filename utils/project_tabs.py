@@ -42,6 +42,7 @@ def render_project_header(project):
         # Model selection dropdown
         st.markdown("#### AI Model")
         available_models = {
+            "gpt-5.1": "GPT-5.1",
             "gpt-5": "GPT-5",
             "gpt-4.1": "GPT-4.1",
             "claude-sonnet-4-5-20250929": "Claude Sonnet 4.5",
