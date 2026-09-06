@@ -10,6 +10,8 @@ pdfplumber>=0.11.0
 pillow>=10.0.0
 streamlit-extras>=0.3.0
 openpyxl>=3.1.0
+requests>=2.31.0
+cryptography>=41.0.0
 
 # LangChain multi-provider AI support
 langchain-openai>=1.0.0
