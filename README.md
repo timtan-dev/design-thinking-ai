@@ -5,6 +5,9 @@ An AI-powered application that guides users through the complete Design Thinking
 ## Demo
 [Live Demo Click Here](https://design-thinking-ai-chen2106.streamlit.app/)
 
+## Screenshot
+![Screenshot](/assets/designthinkingagent_screenshot.png)
+
 ## Overview
 
 The Design Thinking AI Agent helps teams and individuals systematically innovate and solve problems using the proven Design Thinking methodology. With integrated AI assistance, automated template generation, and comprehensive project management, this tool streamlines the entire creative process from empathy research to implementation.
