@@ -1,6 +1,6 @@
 """Time utility functions for the application"""
 
-import pytz
+from datetime import timezone
 
 
 def format_local_time(utc_datetime):
@@ -17,7 +17,7 @@ def format_local_time(utc_datetime):
 
     # Assume UTC if no timezone info
     if utc_datetime.tzinfo is None:
-        utc_datetime = utc_datetime.replace(tzinfo=pytz.UTC)
+        utc_datetime = utc_datetime.replace(tzinfo=timezone.utc)
 
     # Convert to local timezone
     local_datetime = utc_datetime.astimezone()
